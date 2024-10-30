@@ -36,3 +36,11 @@ az deployment group create --resource-group <resourcegroupname> --template-file 
 ## Output
 
 - Public IP Address of the VM to connect via RDP
+
+## Clean up deployment
+
+To remove the resources that were created as part of this deployment, use the following command:
+
+```Terminal
+az group delete --name <resourcegroupname> --yes --no-wait
+```
