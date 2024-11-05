@@ -18,11 +18,11 @@ param VmSize string = 'Standard_D2_v3'
 @description('Location for all resources.')
 param location string = resourceGroup().location
 
-var vnetName = 'myVirtualNetwork'
-var vnetAddressPrefix = '10.0.0.0/16'
-var subnet1Prefix = '10.0.0.0/24'
+var vnetName = 'sqlpeVNET'
+var vnetAddressPrefix = '10.100.0.0/16'
+var subnet1Prefix = '10.100.0.0/24'
 var subnet1Name = 'defaultsubnet'
-var subnet2Prefix = '10.0.1.0/24'
+var subnet2Prefix = '10.100.1.0/24'
 var subnet2Name = 'privateendpointsubnet'
 var sqlServerName = 'sqlserver${uniqueString(resourceGroup().id)}'
 var databaseName = '${sqlServerName}/sample-db'
@@ -264,5 +264,7 @@ resource vm 'Microsoft.Compute/virtualMachines@2021-11-01' = {
   }
 }
 
-output IPAddress string = publicIpAddress.properties.ipAddress
+//output IPAddress string = publicIpAddress.properties.ipAddress
+//generate output of VNET for peering
+output vnetId string = vnet.id
 
