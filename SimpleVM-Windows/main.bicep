@@ -11,9 +11,20 @@ param allowedRdpSourceAddress string
 @description('The location of the resource group.')
 param location string = resourceGroup().location
 
+@description('Specifies whether to use a custom image or a default image. Select "Yes" for custom image, "No" for default image.')
+@allowed([
+  'Yes'
+  'No'
+])
+param useCustomImage string
+
+@description('The resource ID of the custom image to use if useCustomImage is true.')
+param customImageResourceId string = '/subscriptions/8f8bee69-0b24-457d-a9af-3623095b0d78/resourceGroups/shaiknlab2/providers/Microsoft.Compute/images/shaiknimage'
+
+var useCustomImageBool = useCustomImage == 'Yes' ? true : false 
 
 resource vnet 'Microsoft.Network/virtualNetworks@2020-06-01' = {
-  name: 'myVnet'
+  name: 'clientVNET'
   location: location
   properties: {
     addressSpace: {
@@ -31,7 +42,6 @@ resource vnet 'Microsoft.Network/virtualNetworks@2020-06-01' = {
     ]
   }
 }
-
 resource nsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
   name: 'myNsg'
   location: location
@@ -54,7 +64,7 @@ resource nsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
   }
 }
 
-resource publicIp 'Microsoft.Network/publicIPAddresses@2020-06-01' = {
+resource publicIp 'Microsoft.Network/publicIPAddresses@2024-01-01' = {
   name: 'myPublicIp'
   location: location
   properties: {
@@ -99,7 +109,9 @@ resource vm 'Microsoft.Compute/virtualMachines@2020-06-01' = {
       adminPassword: adminPassword
     }
     storageProfile: {
-      imageReference: {
+      imageReference: useCustomImageBool ? {
+        id: customImageResourceId
+      } : {
         publisher: 'MicrosoftWindowsServer'
         offer: 'WindowsServer'
         sku: '2019-Datacenter'
@@ -119,6 +131,6 @@ resource vm 'Microsoft.Compute/virtualMachines@2020-06-01' = {
   }
 }
 
-output publicIpAddress string = publicIp.properties.ipAddress
+
 
 
