@@ -91,7 +91,7 @@ resource vm 'Microsoft.Compute/virtualMachines@2020-06-01' = {
   location: location
   properties: {
     hardwareProfile: {
-      vmSize: 'Standard_DS1_v2'
+      vmSize: 'Standard_D2s_v3'
     }
     osProfile: {
       computerName: 'myVm'
@@ -102,7 +102,7 @@ resource vm 'Microsoft.Compute/virtualMachines@2020-06-01' = {
       imageReference: {
         publisher: 'MicrosoftWindowsServer'
         offer: 'WindowsServer'
-        sku: '2012-R2-Datacenter'
+        sku: '2019-Datacenter'
         version: 'latest'
       }
       osDisk: {
