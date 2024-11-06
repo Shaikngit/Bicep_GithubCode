@@ -10,6 +10,13 @@ param adminpassword string
 param adminusername string
 param allowedRdpSourceAddress string
 
+@description('Specifies whether to use a custom image or a default image. Select "Yes" for custom image, "No" for default image.')
+@allowed([
+  'Yes'
+  'No'
+])
+param useCustomImage string = 'No'
+
 // Modules
 module clientVM 'clientVM/client.bicep' = {
   name: 'clientVMDeployment'
@@ -18,6 +25,7 @@ module clientVM 'clientVM/client.bicep' = {
     adminPassword: adminpassword
     adminUsername: adminusername
     allowedRdpSourceAddress: allowedRdpSourceAddress
+    useCustomImage: useCustomImage
   }
 }
 
@@ -117,3 +125,21 @@ resource vnetPeeringFirewallToSql 'Microsoft.Network/virtualNetworks/virtualNetw
     useRemoteGateways: false
   }
 }
+
+resource routeTable 'Microsoft.Network/routeTables@2020-11-01' = {
+  name: 'clientVMRouteTable'
+  location: location
+  properties: {
+    routes: [
+      {
+        name: 'routeToFirewall'
+        properties: {
+          addressPrefix: '0.0.0.0/0'
+          nextHopType: 'VirtualAppliance'
+          nextHopIpAddress: firewall.outputs.firewallIpAddress
+        }
+      }
+    ]
+  }
+}
+

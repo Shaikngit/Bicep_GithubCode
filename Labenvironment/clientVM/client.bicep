@@ -16,7 +16,7 @@ param location string = resourceGroup().location
   'Yes'
   'No'
 ])
-param useCustomImage string
+param useCustomImage string = 'No'
 
 @description('The resource ID of the custom image to use if useCustomImage is true.')
 param customImageResourceId string = '/subscriptions/8f8bee69-0b24-457d-a9af-3623095b0d78/resourceGroups/shaiknlab2/providers/Microsoft.Compute/images/shaiknimage'
@@ -37,6 +37,9 @@ resource vnet 'Microsoft.Network/virtualNetworks@2020-06-01' = {
         name: 'default'
         properties: {
           addressPrefix: '10.10.0.0/24'
+          routeTable: {
+            id: routeTable.id
+          }
         }
       }
     ]
@@ -63,6 +66,24 @@ resource nsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
     ]
   }
 }
+
+resource routeTable 'Microsoft.Network/routeTables@2020-11-01' = {
+  name: 'clientVMRouteTable'
+  location: location
+  properties: {
+    routes: [
+      // {
+      //   name: 'routeToFirewall'
+      //   properties: {
+      //     addressPrefix: '0.0.0.0/0'
+      //     nextHopType: 'VirtualAppliance'
+      //     nextHopIpAddress: firewall.outputs.firewallIpAddress
+      //   }
+      // }
+    ]
+  }
+}
+
 
 resource publicIp 'Microsoft.Network/publicIPAddresses@2024-01-01' = {
   name: 'myPublicIp'
@@ -132,6 +153,7 @@ resource vm 'Microsoft.Compute/virtualMachines@2020-06-01' = {
 }
 
 output vnetId string = vnet.id
+output vnetname string = vnet.name
 // output publicIpAddress string = publicIp.properties.ipAddress
 
 

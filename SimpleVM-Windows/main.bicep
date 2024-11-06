@@ -11,12 +11,12 @@ param allowedRdpSourceAddress string
 @description('The location of the resource group.')
 param location string = resourceGroup().location
 
-@description('Specifies whether to use a custom image or a default image. Select "Yes" for custom image, "No" for default image.')
+@description('Specifies whether to use a custom image or a default image.')
 @allowed([
   'Yes'
   'No'
 ])
-param useCustomImage string
+param useCustomImage string = 'No'
 
 @description('The resource ID of the custom image to use if useCustomImage is true.')
 param customImageResourceId string = '/subscriptions/8f8bee69-0b24-457d-a9af-3623095b0d78/resourceGroups/shaiknlab2/providers/Microsoft.Compute/images/shaiknimage'

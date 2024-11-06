@@ -64,3 +64,6 @@ resource firewall 'Microsoft.Network/azureFirewalls@2021-02-01' = {
 
 // generate output of VNET for peering
 output vnetId string = vnet.id
+output firewallIpAddress string = firewall.properties.ipConfigurations[0].properties.privateIPAddress
+
+
