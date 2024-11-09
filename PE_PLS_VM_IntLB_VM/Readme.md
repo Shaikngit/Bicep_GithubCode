@@ -24,6 +24,12 @@ az group create --name <resourcegroupname> --location <location>
 
 az deployment group create --resource-group <resourcegroupname> --template-file main.bicep 
 ```
+To deploy the resources with custom image defined in the `main.bicep` file, use the following command:
+
+```Terminal 
+
+az deployment group create --resource-group peplspublicshaiknlab --template-file main.bicep --parameters useCustomImage=Yes
+```
 
 ## Input 
 
@@ -60,27 +66,9 @@ Multiple Azure resources are defined in the Bicep file:
 
 ## Connect to a VM from the Internet
 
-Connect to the VM `myConsumerVm{uniqueid}` from the internet as follows:
+There are two VMs in this lab: mySvcVm{uniqueid} and myCnsmrvm{uniqueid}. You'll connect to myCnsmrvm{uniqueid} from the internet and access the HTTP service privately from the VM. mySvcVm{uniqueid} hosts the HTTP service which is behind the private link service and exposed through the private endpoint. myCnsmrvm{uniqueid} is used to access the HTTP service privately.
 
-In the Azure portal search bar, enter myConsumerVm{uniqueid}.
-
-Select Connect. Connect to virtual machine opens.
-
-Select Download RDP File. Azure creates a Remote Desktop Protocol (.rdp) file and downloads it to your computer.
-
-Open the downloaded .rdp file.
-
-a. If prompted, select Connect.
-
-b. Enter the username and password you specified when you created the VM.
-> **Note**: You might need to select **More choices > Use a different account**, to specify the credentials you entered when you created the VM.
-You might need to select More choices > Use a different account, to specify the credentials you entered when you created the VM.
-
-Select OK.
-
-You might receive a certificate warning during the sign-in process. If you receive a certificate warning, select Yes or Continue.
-
-After the VM desktop appears, minimize it to go back to your local desktop.
+Connect to the VM `myCnsmrvm{uniqueid}` from the internet as follows:
 
 Access the http service privately from the VM
 ## Access the HTTP Service Privately from the VM

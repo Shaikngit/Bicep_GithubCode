@@ -21,6 +21,9 @@ param useCustomImage string = 'No'
 @description('The resource ID of the custom image to use if useCustomImage is true.')
 param customImageResourceId string = '/subscriptions/8f8bee69-0b24-457d-a9af-3623095b0d78/resourceGroups/shaiknlab2/providers/Microsoft.Compute/images/shaiknimage'
 
+@description('The allowed IP address for RDP access.')
+param allowedRdpSourceAddress string
+
 var useCustomImageBool = useCustomImage == 'Yes' ? true : false 
 
 var vnetName = 'myVirtualNetwork'
@@ -37,9 +40,9 @@ var backendPoolName = 'myBackEndPool'
 var loadBalancerFrontEndIpConfigurationName = 'myFrontEnd'
 var healthProbeName = 'myHealthProbe'
 var privateEndpointName = 'myPrivateEndpoint'
-var vmName = take('myVm${uniqueString(resourceGroup().id)}', 15)
+var vmName = take('mySvcVm${uniqueString(resourceGroup().id)}', 15)
 var networkInterfaceName = '${vmName}NetInt'
-var vmConsumerName = take('mycnsmrvm${uniqueString(resourceGroup().id)}', 15)
+var vmConsumerName = take('myCnsmrvm${uniqueString(resourceGroup().id)}', 15)
 var publicIpAddressConsumerName = '${vmConsumerName}PublicIP'
 var networkInterfaceConsumerName = '${vmConsumerName}NetInt'
 var osDiskType = 'StandardSSD_LRS'
@@ -179,6 +182,28 @@ resource networkInterface 'Microsoft.Network/networkInterfaces@2021-05-01' = {
   dependsOn: [
     loadbalancer
   ]
+}
+
+resource nsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
+  name: 'myNsg'
+  location: location
+  properties: {
+    securityRules: [
+      {
+        name: 'AllowRDP'
+        properties: {
+          priority: 1000
+          direction: 'Inbound'
+          access: 'Allow'
+          protocol: 'Tcp'
+          sourcePortRange: '*'
+          destinationPortRange: '3389'
+          sourceAddressPrefix: allowedRdpSourceAddress
+          destinationAddressPrefix: '*'
+        }
+      }
+    ]
+  }
 }
 
 resource vm 'Microsoft.Compute/virtualMachines@2021-11-01' = {
@@ -328,9 +353,13 @@ resource networkInterfaceConsumer 'Microsoft.Network/networkInterfaces@2021-05-0
           subnet: {
             id: resourceId('Microsoft.Network/virtualNetworks/subnets', vnetConsumerName, consumerSubnetName)
           }
+          
         }
       }
     ]
+    networkSecurityGroup: {
+      id: nsg.id    
+    }
   }
   dependsOn: [
     vnetConsumer
