@@ -1,11 +1,13 @@
 # Bicep Deployment Script
 
-This repository contains a Bicep script for Private Link Service 
+This repository contains a Bicep script for Lab purpose of Private End point / Private Link Service
+
+The PLS is associated to ILB of the backend VM 
 
 ## File Structure
 
 - `main.bicep`: The main Bicep script that defines the infrastructure.
-
+  
 ## Prerequisites
 
 - VS Code installed
@@ -25,8 +27,6 @@ az deployment group create --resource-group <resourcegroupname> --template-file 
 
 ## Input 
 
-- Resource Group Name
-- Location
 - Admin Username
 - Admin Password
 - Public IP Address of your machine to allow RDP
