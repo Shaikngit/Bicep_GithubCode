@@ -11,6 +11,18 @@ param vmSize string = 'Standard_D2_v3'
 @description('Location for all resources.')
 param location string = resourceGroup().location
 
+@description('Specifies whether to use a custom image or a default image.')
+@allowed([
+  'Yes'
+  'No'
+])
+param useCustomImage string = 'No'
+
+@description('The resource ID of the custom image to use if useCustomImage is true.')
+param customImageResourceId string = '/subscriptions/8f8bee69-0b24-457d-a9af-3623095b0d78/resourceGroups/shaiknlab2/providers/Microsoft.Compute/images/shaiknimage'
+
+var useCustomImageBool = useCustomImage == 'Yes' ? true : false 
+
 var vnetName = 'myVirtualNetwork'
 var vnetConsumerName = 'myPEVnet'
 var vnetAddressPrefix = '10.0.0.0/16'
@@ -21,8 +33,11 @@ var backendSubnetName = 'backendSubnet'
 var consumerSubnetPrefix = '10.0.0.0/24'
 var consumerSubnetName = 'myPESubnet'
 var loadbalancerName = 'myILB'
+var lbFrontEndName = 'LoadBalancerFrontEnd'
+var lbPublicIpAddressName = '${vmConsumerName}-lbPublicIP'
+var lbSkuName = 'Standard'
 var backendPoolName = 'myBackEndPool'
-var loadBalancerFrontEndIpConfigurationName = 'myFrontEnd'
+var loadBalancerFrontEndIpConfigurationName = lbFrontEndName
 var healthProbeName = 'myHealthProbe'
 var privateEndpointName = 'myPrivateEndpoint'
 var vmName = take('myVm${uniqueString(resourceGroup().id)}', 15)
@@ -70,11 +85,10 @@ resource loadbalancer 'Microsoft.Network/loadBalancers@2021-05-01' = {
   properties: {
     frontendIPConfigurations: [
       {
-        name: loadBalancerFrontEndIpConfigurationName
+        name: lbFrontEndName
         properties: {
-          privateIPAllocationMethod: 'Dynamic'
-          subnet: {
-            id: resourceId('Microsoft.Network/virtualNetworks/subnets', vnetName, frontendSubnetName)
+          publicIPAddress: {
+            id: lbPublicIPAddress.id
           }
         }
       }
@@ -135,6 +149,18 @@ resource loadbalancer 'Microsoft.Network/loadBalancers@2021-05-01' = {
   ]
 }
 
+resource lbPublicIPAddress 'Microsoft.Network/publicIPAddresses@2021-08-01' = {
+  name: lbPublicIpAddressName
+  location: location
+  sku: {
+    name: lbSkuName
+  }
+  properties: {
+    publicIPAddressVersion: 'IPv4'
+    publicIPAllocationMethod: 'Static'
+  }
+}
+
 resource networkInterface 'Microsoft.Network/networkInterfaces@2021-05-01' = {
   name: networkInterfaceName
   location: location
@@ -185,7 +211,9 @@ resource vm 'Microsoft.Compute/virtualMachines@2021-11-01' = {
       adminPassword: vmAdminPassword
     }
     storageProfile: {
-      imageReference: {
+      imageReference: useCustomImageBool ? {
+        id: customImageResourceId
+      } :{
         publisher: 'MicrosoftWindowsServer'
         offer: 'WindowsServer'
         sku: '2019-Datacenter'
@@ -246,7 +274,7 @@ resource privatelinkService 'Microsoft.Network/privateLinkServices@2021-05-01' =
           privateIPAllocationMethod: 'Dynamic'
           privateIPAddressVersion: 'IPv4'
           subnet: {
-            id: reference(loadbalancerId, '2019-06-01').frontendIPConfigurations[0].properties.subnet.id
+            id: resourceId('Microsoft.Network/virtualNetworks/subnets', vnetName, frontendSubnetName)
           }
           primary: false
         }
