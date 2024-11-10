@@ -45,8 +45,6 @@ az deployment group create --resource-group <resourcegroupname> --template-file 
 
 ## Input 
 
-- Resource Group Name
-- Location
 - Admin Username
 - Admin Password
 - Public IP Address of your machine to allow RDP
