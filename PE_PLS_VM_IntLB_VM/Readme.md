@@ -2,7 +2,7 @@
 
 This repository contains a Bicep script for Lab purpose of Private End point / Private Link Service
 
-The PLS is associated to ALB of the backend VM 
+The PLS is associated to ILB of the backend VM 
 
 ## File Structure
 
