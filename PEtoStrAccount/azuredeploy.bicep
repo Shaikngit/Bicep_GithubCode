@@ -75,7 +75,7 @@ param dataDiskSize int = 50
 @description('Specifies the caching requirements for the data disks.')
 param dataDiskCaching string = 'ReadWrite'
 
-@description('Specifies the base URI where artifacts required by this template are located including a trailing \'/\'')
+@description('Specifies the base URI where artifacts required by this template are located including a SAS Token')
 //  param _artifactsLocation string = deployment().properties.templateLink.uri
 param scriptFileUri string
 

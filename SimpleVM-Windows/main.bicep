@@ -19,8 +19,8 @@ param location string = resourceGroup().location
 param useCustomImage string = 'No'
 
 @description('The resource ID of the custom image to use if useCustomImage is true.')
-param customImageResourceId string = '/subscriptions/8f8bee69-0b24-457d-a9af-3623095b0d78/resourceGroups/shaiknlab2/providers/Microsoft.Compute/images/shaiknimage'
-
+//param customImageResourceId string = '/subscriptions/8f8bee69-0b24-457d-a9af-3623095b0d78/resourceGroups/shaiknlab2/providers/Microsoft.Compute/galleries/shaikngallery/images/newvmdef/versions/0.0.1'
+param customImageResourceId string = '/subscriptions/8f8bee69-0b24-457d-a9af-3623095b0d78/resourceGroups/shaiknlab2/providers/Microsoft.Compute/galleries/shaikngallery/images/newvmdef/versions/0.0.1'
 var useCustomImageBool = useCustomImage == 'Yes' ? true : false 
 
 resource vnet 'Microsoft.Network/virtualNetworks@2020-06-01' = {
