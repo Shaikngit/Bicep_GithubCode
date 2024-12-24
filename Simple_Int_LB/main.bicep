@@ -33,6 +33,9 @@ param lbPublicIPAddress string = '10.0.0.6'
 ])
 param useCustomImage string = 'No'
 
+@description('Name of the test VM')
+param testVmName string = 'TestVM'
+
 @description('The resource ID of the custom image to use if useCustomImage is true.')
 param customImageResourceId string = '/subscriptions/8f8bee69-0b24-457d-a9af-3623095b0d78/resourceGroups/shaiknlab2/providers/Microsoft.Compute/galleries/shaikngallery/images/newvmdef/versions/0.0.1'
 
@@ -167,7 +170,6 @@ resource networkInterface 'Microsoft.Network/networkInterfaces@2023-09-01' = [fo
     ]
   }
   dependsOn: [
-    vNet
     loadBalancer
   ]
 }]
@@ -279,6 +281,65 @@ resource vm 'Microsoft.Compute/virtualMachines@2023-09-01' = [for i in range(0, 
     }
   }
 }]
+
+resource testVmNetworkInterface 'Microsoft.Network/networkInterfaces@2023-09-01' = {
+  name: '${testVmName}-nic'
+  location: location
+  properties: {
+    ipConfigurations: [
+      {
+        name: 'ipconfig1'
+        properties: {
+          privateIPAllocationMethod: 'Dynamic'
+          subnet: {
+            id: vNetName_vNetSubnetName.id
+          }
+        }
+      }
+    ]
+  }
+}
+
+resource testVm 'Microsoft.Compute/virtualMachines@2023-09-01' = {
+  name: testVmName
+  location: location
+  properties: {
+    hardwareProfile: {
+      vmSize: vmSize
+    }
+    osProfile: {
+      computerName: testVmName
+      adminUsername: adminUsername
+      adminPassword: adminPassword
+    }
+    storageProfile: {
+      imageReference: useCustomImageBool ? {
+        id: customImageResourceId
+      } : {
+        publisher: 'MicrosoftWindowsServer'
+        offer: 'WindowsServer'
+        sku: '2019-Datacenter'
+        version: 'latest'
+      }
+      osDisk: {
+        createOption: 'FromImage'
+      }
+    }
+    networkProfile: {
+      networkInterfaces: [
+        {
+          id: testVmNetworkInterface.id
+        }
+      ]
+    }
+    diagnosticsProfile: {
+      bootDiagnostics: {
+        enabled: true
+        storageUri: storageAccount.properties.primaryEndpoints.blob
+      }
+    }
+  }
+}
 
 output location string = location
 output name string = loadBalancer.name
