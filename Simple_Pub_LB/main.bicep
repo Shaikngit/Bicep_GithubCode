@@ -1,64 +1,30 @@
-@description('Specifies a project name that is used for generating resource names.')
-param projectName string
-
-@description('Specifies the location for all of the resources created by this template.')
-param location string = resourceGroup().location
-
-@description('Specifies the virtual machine administrator username.')
+@description('Admin username')
 param adminUsername string
 
-@description('Specifies the virtual machine administrator password.')
+@description('Admin password')
 @secure()
 param adminPassword string
 
-@description('Size of the virtual machine')
+@description('Prefix to use for VM names')
+param vmNamePrefix string = 'BackendVM'
+
+@description('Location for all resources.')
+param location string = resourceGroup().location
+
+@description('Size of VM')
 param vmSize string = 'Standard_D2s_v3'
 
-@description('The Windows version for the VM. This will pick a fully patched image of this given Windows version.')
-@allowed([
-  '2016-datacenter-gensecond'
-  '2016-datacenter-server-core-g2'
-  '2016-datacenter-server-core-smalldisk-g2'
-  '2016-datacenter-smalldisk-g2'
-  '2016-datacenter-with-containers-g2'
-  '2016-datacenter-zhcn-g2'
-  '2019-datacenter-core-g2'
-  '2019-datacenter-core-smalldisk-g2'
-  '2019-datacenter-core-with-containers-g2'
-  '2019-datacenter-core-with-containers-smalldisk-g2'
-  '2019-datacenter-gensecond'
-  '2019-datacenter-smalldisk-g2'
-  '2019-datacenter-with-containers-g2'
-  '2019-datacenter-with-containers-smalldisk-g2'
-  '2019-datacenter-zhcn-g2'
-  '2022-datacenter-azure-edition'
-  '2022-datacenter-azure-edition-core'
-  '2022-datacenter-azure-edition-core-smalldisk'
-  '2022-datacenter-azure-edition-smalldisk'
-  '2022-datacenter-core-g2'
-  '2022-datacenter-core-smalldisk-g2'
-  '2022-datacenter-g2'
-  '2022-datacenter-smalldisk-g2'
-])
-param OSVersion string = '2022-datacenter-azure-edition'
+@description('Virtual network address prefix')
+param vNetAddressPrefix string = '10.0.0.0/16'
 
-// @description('Linux Sku')
-// @allowed([
-//   'vs-2019-ent-latest-win11-n-gen2'
-//   'vs-2019-pro-general-win11-m365-gen2'
-//   'vs-2019-comm-latest-win11-n-gen2'
-//   'vs-2019-ent-general-win10-m365-gen2'
-//   'vs-2019-ent-general-win11-m365-gen2'
-//   'vs-2019-pro-general-win10-m365-gen2'
-// ])
-// param imageSku string = 'vs-2019-ent-latest-win11-n-gen2'
+@description('Backend subnet address prefix')
+param vNetSubnetAddressPrefix string = '10.0.0.0/24'
 
-@description('Security Type of the Virtual Machine.')
-@allowed([
-  'Standard'
-  'TrustedLaunch'
-])
-param securityType string = 'TrustedLaunch'
+@description('Bastion subnet address prefix')
+param vNetBastionSubnetAddressPrefix string = '10.0.2.0/24'
+
+@description('Name of Public IP address of load balancer')
+param lbPublicIpAddressName string = 'lbPublicIP'
 
 @description('Specifies whether to use a custom image or a default image.')
 @allowed([
@@ -67,168 +33,29 @@ param securityType string = 'TrustedLaunch'
 ])
 param useCustomImage string = 'No'
 
+@description('Name of the test VM')
+param testVmName string = 'TestVM'
+
 @description('The resource ID of the custom image to use if useCustomImage is true.')
 param customImageResourceId string = '/subscriptions/8f8bee69-0b24-457d-a9af-3623095b0d78/resourceGroups/shaiknlab2/providers/Microsoft.Compute/galleries/shaikngallery/images/newvmdef/versions/0.0.1'
 
 var useCustomImageBool = useCustomImage == 'Yes' ? true : false 
 
-var securityProfileJson = {
-  uefiSettings: {
-    secureBootEnabled: true
-    vTpmEnabled: true
-  }
-  securityType: securityType
-}
-var lbName = '${projectName}-lb'
+var natGatewayName = 'lb-nat-gateway'
+var natGatewayPublicIPAddressName = 'lb-nat-gateway-ip'
+var vNetName = 'lb-vnet'
+var vNetSubnetName = 'backend-subnet'
+var storageAccountType = 'Standard_LRS'
+var storageAccountName = uniqueString(resourceGroup().id)
+var loadBalancerName = 'Public-lb'
+var networkInterfaceName = 'lb-nic'
+var numberOfInstances = 2
 var lbSkuName = 'Standard'
-var lbPublicIpAddressName = '${projectName}-lbPublicIP'
-var lbFrontEndName = 'LoadBalancerFrontEnd'
-var lbBackendPoolName = 'LoadBalancerBackEndPool'
-var lbProbeName = 'loadBalancerHealthProbe'
-var nsgName = '${projectName}-nsg'
-var vNetName = '${projectName}-vnet'
-var vNetAddressPrefix = '10.0.0.0/16'
-var vNetSubnetName = 'BackendSubnet'
-var vNetSubnetAddressPrefix = '10.0.0.0/24'
-var bastionName = '${projectName}-bastion'
+var bastionName = 'lb-bastion'
 var bastionSubnetName = 'AzureBastionSubnet'
-var vNetBastionSubnetAddressPrefix = '10.0.1.0/24'
-var bastionPublicIPAddressName = '${projectName}-bastionPublicIP'
-var vmStorageAccountType = 'Premium_LRS'
-var extensionName = 'GuestAttestation'
-var extensionPublisher = 'Microsoft.Azure.Security.WindowsAttestation'
-var extensionVersion = '1.0'
-var maaTenantName = 'GuestAttestation'
-var maaEndpoint = substring('emptyString', 0, 0)
-var ascReportingEndpoint = substring('emptystring', 0, 0)
-var natGatewayName = '${projectName}-natgateway'
-var natGatewayPublicIPAddressName = '${projectName}-natPublicIP'
+var bastionPublicIPAddressName = 'lb-bastion-ip'
 
-resource project_vm_1_networkInterface 'Microsoft.Network/networkInterfaces@2021-08-01' = [for i in range(0, 3): {
-  name: '${projectName}-vm${(i + 1)}-networkInterface'
-  location: location
-  properties: {
-    ipConfigurations: [
-      {
-        name: 'ipconfig1'
-        properties: {
-          privateIPAllocationMethod: 'Dynamic'
-          subnet: {
-            id: vNetName_vNetSubnetName.id
-          }
-          loadBalancerBackendAddressPools: [
-            {
-              id: resourceId('Microsoft.Network/loadBalancers/backendAddressPools', lbName, lbBackendPoolName)
-            }
-          ]
-        }
-      }
-    ]
-    networkSecurityGroup: {
-      id: nsg.id
-    }
-  }
-  dependsOn: [
-    lb
-  ]
-}]
-
-resource project_vm_1_InstallWebServer 'Microsoft.Compute/virtualMachines/extensions@2021-11-01' = [for i in range(0, 3): {
-  name: '${projectName}-vm${(i + 1)}/InstallWebServer'
-  location: location
-  properties: {
-    publisher: 'Microsoft.Compute'
-    type: 'CustomScriptExtension'
-    typeHandlerVersion: '1.10'
-    autoUpgradeMinorVersion: true
-    settings: {
-      commandToExecute: 'powershell.exe Install-WindowsFeature -name Web-Server -IncludeManagementTools && powershell.exe remove-item \'C:\\inetpub\\wwwroot\\iisstart.htm\' && powershell.exe Add-Content -Path \'C:\\inetpub\\wwwroot\\iisstart.htm\' -Value $(\'Hello World from \' + $env:computername)'
-    }
-  }
-  dependsOn: [
-    project_vm_1
-  ]
-}]
-
-resource project_vm_1 'Microsoft.Compute/virtualMachines@2021-11-01' = [for i in range(1, 3): {
-  name: '${projectName}-vm${i}'
-  location: location
-  zones: [
-    string(i)
-  ]
-  properties: {
-    hardwareProfile: {
-      vmSize: vmSize
-    }
-    storageProfile: {
-      imageReference: useCustomImageBool ? {
-        id: customImageResourceId
-      } : {
-        publisher: 'MicrosoftWindowsServer'
-        offer: 'WindowsServer'
-        sku: OSVersion
-        version: 'latest'
-      }
-      osDisk: {
-        createOption: 'FromImage'
-        managedDisk: {
-          storageAccountType: vmStorageAccountType
-        }
-      }
-    }
-    networkProfile: {
-      networkInterfaces: [
-        {
-          id: resourceId('Microsoft.Network/networkInterfaces', '${projectName}-vm${i}-networkInterface')
-        }
-      ]
-    }
-    osProfile: {
-      computerName: '${projectName}-vm${i}'
-      adminUsername: adminUsername
-      adminPassword: adminPassword
-      windowsConfiguration: {
-        enableAutomaticUpdates: true
-        provisionVMAgent: true
-      }
-    }
-    securityProfile: ((securityType == 'TrustedLaunch') ? securityProfileJson : null)
-  }
-  dependsOn: [
-    project_vm_1_networkInterface
-  ]
-}]
-
-resource projectName_vm_1_3_GuestAttestation 'Microsoft.Compute/virtualMachines/extensions@2022-03-01' = [for i in range(1, 3): if ((securityType == 'TrustedLaunch') && ((securityProfileJson.uefiSettings.secureBootEnabled == true) && (securityProfileJson.uefiSettings.vTpmEnabled == true))) {
-  name: '${projectName}-vm${i}/GuestAttestation'
-  location: location
-  properties: {
-    publisher: extensionPublisher
-    type: extensionName
-    typeHandlerVersion: extensionVersion
-    autoUpgradeMinorVersion: true
-    enableAutomaticUpgrade: true
-    settings: {
-      AttestationConfig: {
-        MaaSettings: {
-          maaEndpoint: maaEndpoint
-          maaTenantName: maaTenantName
-        }
-        AscSettings: {
-          ascReportingEndpoint: ascReportingEndpoint
-          ascReportingFrequency: ''
-        }
-        useCustomToken: 'false'
-        disableAlerts: 'false'
-      }
-    }
-  }
-  dependsOn: [
-    project_vm_1
-  ]
-}]
-
-resource natGateway 'Microsoft.Network/natGateways@2021-05-01' = {
+resource natGateway 'Microsoft.Network/natGateways@2023-09-01' = {
   name: natGatewayName
   location: location
   sku: {
@@ -244,7 +71,7 @@ resource natGateway 'Microsoft.Network/natGateways@2021-05-01' = {
   }
 }
 
-resource natGatewayPublicIPAddress 'Microsoft.Network/publicIPAddresses@2021-05-01' = {
+resource natGatewayPublicIPAddress 'Microsoft.Network/publicIPAddresses@2023-09-01' = {
   name: natGatewayPublicIPAddressName
   location: location
   sku: {
@@ -257,18 +84,27 @@ resource natGatewayPublicIPAddress 'Microsoft.Network/publicIPAddresses@2021-05-
   }
 }
 
-resource vNetName_bastionSubnet 'Microsoft.Network/virtualNetworks/subnets@2021-08-01' = {
+resource vNet 'Microsoft.Network/virtualNetworks@2023-09-01' = {
+  name: vNetName
+  location: location
+  properties: {
+    addressSpace: {
+      addressPrefixes: [
+        vNetAddressPrefix
+      ]
+    }
+  }
+}
+
+resource vNetName_bastionSubnet 'Microsoft.Network/virtualNetworks/subnets@2023-09-01' = {
   parent: vNet
   name: bastionSubnetName
   properties: {
     addressPrefix: vNetBastionSubnetAddressPrefix
   }
-  dependsOn: [
-    vNetName_vNetSubnetName
-  ]
 }
 
-resource vNetName_vNetSubnetName 'Microsoft.Network/virtualNetworks/subnets@2021-08-01' = {
+resource vNetName_vNetSubnetName 'Microsoft.Network/virtualNetworks/subnets@2023-09-01' = {
   parent: vNet
   name: vNetSubnetName
   properties: {
@@ -279,7 +115,7 @@ resource vNetName_vNetSubnetName 'Microsoft.Network/virtualNetworks/subnets@2021
   }
 }
 
-resource bastion 'Microsoft.Network/bastionHosts@2021-08-01' = {
+resource bastion 'Microsoft.Network/bastionHosts@2023-09-01' = {
   name: bastionName
   location: location
   properties: {
@@ -300,7 +136,7 @@ resource bastion 'Microsoft.Network/bastionHosts@2021-08-01' = {
   }
 }
 
-resource bastionPublicIPAddress 'Microsoft.Network/publicIPAddresses@2021-08-01' = {
+resource bastionPublicIPAddress 'Microsoft.Network/publicIPAddresses@2023-09-01' = {
   name: bastionPublicIPAddressName
   location: location
   sku: {
@@ -312,67 +148,31 @@ resource bastionPublicIPAddress 'Microsoft.Network/publicIPAddresses@2021-08-01'
   }
 }
 
-resource lb 'Microsoft.Network/loadBalancers@2021-08-01' = {
-  name: lbName
+resource networkInterface 'Microsoft.Network/networkInterfaces@2023-09-01' = [for i in range(0, numberOfInstances): {
+  name: '${networkInterfaceName}${i}'
   location: location
-  sku: {
-    name: lbSkuName
-  }
   properties: {
-    frontendIPConfigurations: [
+    ipConfigurations: [
       {
-        name: lbFrontEndName
+        name: 'ipconfig1'
         properties: {
-          publicIPAddress: {
-            id: lbPublicIPAddress.id
+          privateIPAllocationMethod: 'Dynamic'
+          subnet: {
+            id: vNetName_vNetSubnetName.id
           }
+          loadBalancerBackendAddressPools: [
+            {
+              id: resourceId('Microsoft.Network/loadBalancers/backendAddressPools', loadBalancerName, 'BackendPool1')
+            }
+          ]
         }
       }
-    ]
-    backendAddressPools: [
-      {
-        name: lbBackendPoolName
-      }
-    ]
-    loadBalancingRules: [
-      {
-        name: 'myHTTPRule'
-        properties: {
-          frontendIPConfiguration: {
-            id: resourceId('Microsoft.Network/loadBalancers/frontendIPConfigurations', lbName, lbFrontEndName)
-          }
-          backendAddressPool: {
-            id: resourceId('Microsoft.Network/loadBalancers/backendAddressPools', lbName, lbBackendPoolName)
-          }
-          frontendPort: 80
-          backendPort: 80
-          enableFloatingIP: false
-          idleTimeoutInMinutes: 15
-          protocol: 'Tcp'
-          enableTcpReset: true
-          loadDistribution: 'Default'
-          disableOutboundSnat: true
-          probe: {
-            id: resourceId('Microsoft.Network/loadBalancers/probes', lbName, lbProbeName)
-          }
-        }
-      }
-    ]
-    probes: [
-      {
-        name: lbProbeName
-        properties: {
-          protocol: 'Tcp'
-          port: 80
-          intervalInSeconds: 5
-          numberOfProbes: 2
-        }
-      }
-    ]
-    outboundRules: [
     ]
   }
-}
+  dependsOn: [
+    loadBalancer
+  ]
+}]
 
 resource lbPublicIPAddress 'Microsoft.Network/publicIPAddresses@2021-08-01' = {
   name: lbPublicIpAddressName
@@ -386,41 +186,191 @@ resource lbPublicIPAddress 'Microsoft.Network/publicIPAddresses@2021-08-01' = {
   }
 }
 
-resource nsg 'Microsoft.Network/networkSecurityGroups@2021-08-01' = {
-  name: nsgName
+resource loadBalancer 'Microsoft.Network/loadBalancers@2023-09-01' = {
+  name: loadBalancerName
+  location: location
+  sku: {
+    name: 'Standard'
+  }
+  properties: {
+    frontendIPConfigurations: [
+      {
+        name: 'LoadBalancerFrontend'
+        properties: {
+          publicIPAddress: {
+            id: lbPublicIPAddress.id
+        }
+        
+      }
+    }
+    ]
+    backendAddressPools: [
+      {
+        name: 'BackendPool1'
+      }
+    ]
+    loadBalancingRules: [
+      {
+        properties: {
+          frontendIPConfiguration: {
+            id: resourceId('Microsoft.Network/loadBalancers/frontendIpConfigurations', loadBalancerName, 'LoadBalancerFrontend')
+          }
+          backendAddressPool: {
+            id: resourceId('Microsoft.Network/loadBalancers/backendAddressPools', loadBalancerName, 'BackendPool1')
+          }
+          probe: {
+            id: resourceId('Microsoft.Network/loadBalancers/probes', loadBalancerName, 'lbprobe')
+          }
+          protocol: 'Tcp'
+          frontendPort: 80
+          backendPort: 80
+          idleTimeoutInMinutes: 15
+        }
+        name: 'lbrule'
+      }
+    ]
+    probes: [
+      {
+        properties: {
+          protocol: 'Tcp'
+          port: 80
+          intervalInSeconds: 15
+          numberOfProbes: 2
+        }
+        name: 'lbprobe'
+      }
+    ]
+  }
+}
+
+resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
+  name: storageAccountName
+  location: location
+  sku: {
+    name: storageAccountType
+  }
+  kind: 'StorageV2'
+}
+
+resource vm 'Microsoft.Compute/virtualMachines@2023-09-01' = [for i in range(0, numberOfInstances): {
+  name: '${vmNamePrefix}${i}'
   location: location
   properties: {
-    securityRules: [
+    hardwareProfile: {
+      vmSize: vmSize
+    }
+    osProfile: {
+      computerName: '${vmNamePrefix}${i}'
+      adminUsername: adminUsername
+      adminPassword: adminPassword
+    }
+    storageProfile: {
+      imageReference: useCustomImageBool ? {
+        id: customImageResourceId
+      } : {
+        publisher: 'MicrosoftWindowsServer'
+        offer: 'WindowsServer'
+        sku: '2019-Datacenter'
+        version: 'latest'
+      }
+      osDisk: {
+        createOption: 'FromImage'
+      }
+    }
+    networkProfile: {
+      networkInterfaces: [
+        {
+          id: networkInterface[i].id
+        }
+      ]
+    }
+    diagnosticsProfile: {
+      bootDiagnostics: {
+        enabled: true
+        storageUri: storageAccount.properties.primaryEndpoints.blob
+      }
+    }
+  }
+}]
+
+resource vmExtension 'Microsoft.Compute/virtualMachines/extensions@2021-11-01' = [for i in range(0, numberOfInstances): {
+  parent: vm[i]
+  name: 'installcustomscript'
+  location: location
+  tags: {
+    displayName: 'install software for Windows VM'
+  }
+  properties: {
+    publisher: 'Microsoft.Compute'
+    type: 'CustomScriptExtension'
+    typeHandlerVersion: '1.9'
+    autoUpgradeMinorVersion: true
+    protectedSettings: {
+      commandToExecute: 'powershell -ExecutionPolicy Unrestricted Install-WindowsFeature -Name Web-Server'
+    }
+  }
+}]
+
+resource testVmNetworkInterface 'Microsoft.Network/networkInterfaces@2023-09-01' = {
+  name: '${testVmName}-nic'
+  location: location
+  properties: {
+    ipConfigurations: [
       {
-        name: 'AllowHTTPInbound'
+        name: 'ipconfig1'
         properties: {
-          protocol: '*'
-          sourcePortRange: '*'
-          destinationPortRange: '80'
-          sourceAddressPrefix: 'Internet'
-          destinationAddressPrefix: '*'
-          access: 'Allow'
-          priority: 100
-          direction: 'Inbound'
+          privateIPAllocationMethod: 'Dynamic'
+          subnet: {
+            id: vNetName_vNetSubnetName.id
+          }
         }
       }
     ]
   }
 }
 
-resource vNet 'Microsoft.Network/virtualNetworks@2021-08-01' = {
-  name: vNetName
+resource testVm 'Microsoft.Compute/virtualMachines@2023-09-01' = {
+  name: testVmName
   location: location
   properties: {
-    addressSpace: {
-      addressPrefixes: [
-        vNetAddressPrefix
+    hardwareProfile: {
+      vmSize: vmSize
+    }
+    osProfile: {
+      computerName: testVmName
+      adminUsername: adminUsername
+      adminPassword: adminPassword
+    }
+    storageProfile: {
+      imageReference: useCustomImageBool ? {
+        id: customImageResourceId
+      } : {
+        publisher: 'MicrosoftWindowsServer'
+        offer: 'WindowsServer'
+        sku: '2019-Datacenter'
+        version: 'latest'
+      }
+      osDisk: {
+        createOption: 'FromImage'
+      }
+    }
+    networkProfile: {
+      networkInterfaces: [
+        {
+          id: testVmNetworkInterface.id
+        }
       ]
+    }
+    diagnosticsProfile: {
+      bootDiagnostics: {
+        enabled: true
+        storageUri: storageAccount.properties.primaryEndpoints.blob
+      }
     }
   }
 }
 
 output location string = location
-output name string = lb.name
+output name string = loadBalancer.name
 output resourceGroupName string = resourceGroup().name
-output resourceId string = lb.id
+output resourceId string = loadBalancer.id

@@ -282,6 +282,24 @@ resource vm 'Microsoft.Compute/virtualMachines@2023-09-01' = [for i in range(0, 
   }
 }]
 
+resource vmExtension 'Microsoft.Compute/virtualMachines/extensions@2021-11-01' = [for i in range(0, numberOfInstances): {
+  parent: vm[i]
+  name: 'installcustomscript'
+  location: location
+  tags: {
+    displayName: 'install software for Windows VM'
+  }
+  properties: {
+    publisher: 'Microsoft.Compute'
+    type: 'CustomScriptExtension'
+    typeHandlerVersion: '1.9'
+    autoUpgradeMinorVersion: true
+    protectedSettings: {
+      commandToExecute: 'powershell -ExecutionPolicy Unrestricted Install-WindowsFeature -Name Web-Server'
+    }
+  }
+}]
+
 resource testVmNetworkInterface 'Microsoft.Network/networkInterfaces@2023-09-01' = {
   name: '${testVmName}-nic'
   location: location
