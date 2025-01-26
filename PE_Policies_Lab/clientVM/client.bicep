@@ -11,6 +11,14 @@ param allowedRdpSourceAddress string
 @description('The location of the resource group.')
 param location string = resourceGroup().location
 
+
+@description('Specifies whether to use Overlake VM size or not.')
+@allowed([
+  'Overlake'
+  'Non-Overlake'
+])
+param vmSizeOption string
+
 @description('Specifies whether to use a custom image or a default image. Select "Yes" for custom image, "No" for default image.')
 @allowed([
   'Yes'
@@ -22,6 +30,7 @@ param useCustomImage string = 'No'
 param customImageResourceId string = '/subscriptions/8f8bee69-0b24-457d-a9af-3623095b0d78/resourceGroups/shaiknlab2/providers/Microsoft.Compute/galleries/shaikngallery/images/newvmdef/versions/0.0.1'
 
 var useCustomImageBool = useCustomImage == 'Yes' ? true : false 
+var vmSize = vmSizeOption == 'Overlake' ? 'Standard_D2s_v5' : 'Standard_D2s_v4'
 
 resource vnet 'Microsoft.Network/virtualNetworks@2020-06-01' = {
   name: 'clientVNET'
@@ -122,7 +131,7 @@ resource vm 'Microsoft.Compute/virtualMachines@2020-06-01' = {
   location: location
   properties: {
     hardwareProfile: {
-      vmSize: 'Standard_D2s_v3'
+      vmSize: vmSize
     }
     osProfile: {
       computerName: 'myVm'

@@ -10,6 +10,13 @@ param adminpassword string
 param adminusername string
 param allowedRdpSourceAddress string
 
+@description('Specifies whether to use Overlake VM size or not.')
+@allowed([
+  'Overlake'
+  'Non-Overlake'
+])
+param vmSizeOption string
+
 @description('Specifies whether to use a custom image or a default image. Select "Yes" for custom image, "No" for default image.')
 @allowed([
   'Yes'
@@ -26,6 +33,7 @@ module clientVM 'clientVM/client.bicep' = {
     adminUsername: adminusername
     allowedRdpSourceAddress: allowedRdpSourceAddress
     useCustomImage: useCustomImage
+    vmSizeOption: vmSizeOption
   }
 }
 

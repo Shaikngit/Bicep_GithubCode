@@ -12,8 +12,13 @@ param vmAdminUsername string
 @secure()
 param vmAdminPassword string
 
-@description('The size of the VM')
-param VmSize string = 'Standard_D2_v3'
+
+@description('Specifies whether to use Overlake VM size or not.')
+@allowed([
+  'Overlake'
+  'Non-Overlake'
+])
+param vmSizeOption string
 
 @description('Location for all resources.')
 param location string = resourceGroup().location
@@ -34,6 +39,7 @@ var publicIpAddressName = '${vmName}PublicIP'
 var networkInterfaceName = '${vmName}NetInt'
 var osDiskType = 'StandardSSD_LRS'
 var networkSecurityGroupName = 'default-NSG'
+var vmSize = vmSizeOption == 'Overlake' ? 'Standard_D2s_v5' : 'Standard_D2s_v4'
 
 resource sqlServer 'Microsoft.Sql/servers@2021-11-01-preview' = {
   name: sqlServerName
@@ -230,7 +236,7 @@ resource vm 'Microsoft.Compute/virtualMachines@2021-11-01' = {
   }
   properties: {
     hardwareProfile: {
-      vmSize: VmSize
+      vmSize: vmSize
     }
     osProfile: {
       computerName: vmName

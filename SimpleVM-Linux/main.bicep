@@ -28,8 +28,16 @@ param ubuntuOSVersion string = 'Ubuntu-2004'
 @description('Location for all resources.')
 param location string = resourceGroup().location
 
-@description('The size of the VM')
-param vmSize string = 'Standard_D2s_v3'
+// @description('The size of the VM')
+// param vmSize string = 'Standard_D2s_v3'
+
+
+@description('Specifies whether to use Overlake VM size or not.')
+@allowed([
+  'Overlake'
+  'Non-Overlake'
+])
+param vmSizeOption string
 
 @description('Name of the VNET')
 param virtualNetworkName string = 'vNet'
@@ -89,6 +97,7 @@ var extensionPublisher = 'Microsoft.Azure.Security.LinuxAttestation'
 var extensionVersion = '1.0'
 var maaTenantName = 'GuestAttestation'
 var maaEndpoint = substring('emptystring', 0, 0)
+var vmSize = vmSizeOption == 'Overlake' ? 'Standard_D2s_v5' : 'Standard_D2s_v4'
 
 resource networkInterface 'Microsoft.Network/networkInterfaces@2023-09-01' = {
   name: networkInterfaceName

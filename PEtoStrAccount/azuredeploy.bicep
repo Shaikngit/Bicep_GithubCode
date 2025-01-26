@@ -22,8 +22,13 @@ param blobStorageAccountName string = 'boot${uniqueString(resourceGroup().id)}'
 @description('Specifies the name of the virtual machine.')
 param vmName string = 'TestVm'
 
-@description('Specifies the size of the virtual machine.')
-param vmSize string = 'Standard_D4s_v3'
+
+@description('Specifies whether to use Overlake VM size or not.')
+@allowed([
+  'Overlake'
+  'Non-Overlake'
+])
+param vmSizeOption string
 
 @description('Specifies the image publisher of the disk image used to create the virtual machine.')
 param imagePublisher string = 'Canonical'
@@ -144,6 +149,7 @@ var adlsStorageAccountPrivateEndpointGroupName = 'dfs'
 var blobStorageAccountPrivateEndpointGroupName = 'blob'
 var adlsPrivateDnsZoneGroupname = '${adlsStorageAccountPrivateEndpointName}/${adlsStorageAccountPrivateEndpointGroupName}PrivateDnsZoneGroup'
 var blobPrivateDnsZoneGroupname = '${blobStorageAccountPrivateEndpointName}/${blobStorageAccountPrivateEndpointGroupName}PrivateDnsZoneGroup'
+var vmSize = vmSizeOption == 'Overlake' ? 'Standard_D2s_v5' : 'Standard_D2s_v4'
 
 resource adlsStorageAccount 'Microsoft.Storage/storageAccounts@2019-06-01' = {
   name: adlsStorageAccountName

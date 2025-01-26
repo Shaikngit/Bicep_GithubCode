@@ -5,8 +5,13 @@ param vmAdminUsername string
 @secure()
 param vmAdminPassword string
 
-@description('The size of the VM')
-param vmSize string = 'Standard_D2_v3'
+
+@description('Specifies whether to use Overlake VM size or not.')
+@allowed([
+  'Overlake'
+  'Non-Overlake'
+])
+param vmSizeOption string
 
 @description('Location for all resources.')
 param location string = resourceGroup().location
@@ -25,7 +30,7 @@ param customImageResourceId string = '/subscriptions/8f8bee69-0b24-457d-a9af-362
 param allowedRdpSourceAddress string
 
 var useCustomImageBool = useCustomImage == 'Yes' ? true : false 
-
+var vmSize = vmSizeOption == 'Overlake' ? 'Standard_D2s_v5' : 'Standard_D2s_v4'
 var vnetName = 'myVirtualNetwork'
 var vnetConsumerName = 'myPEVnet'
 var vnetAddressPrefix = '10.0.0.0/16'

@@ -11,8 +11,13 @@ param vmNamePrefix string = 'BackendVM'
 @description('Location for all resources.')
 param location string = resourceGroup().location
 
-@description('Size of VM')
-param vmSize string = 'Standard_D2s_v3'
+
+@description('Specifies whether to use Overlake VM size or not.')
+@allowed([
+  'Overlake'
+  'Non-Overlake'
+])
+param vmSizeOption string
 
 @description('Virtual network address prefix')
 param vNetAddressPrefix string = '10.0.0.0/16'
@@ -54,6 +59,7 @@ var lbSkuName = 'Standard'
 var bastionName = 'lb-bastion'
 var bastionSubnetName = 'AzureBastionSubnet'
 var bastionPublicIPAddressName = 'lb-bastion-ip'
+var vmSize = vmSizeOption == 'Overlake' ? 'Standard_D2s_v5' : 'Standard_D2s_v4'
 
 resource natGateway 'Microsoft.Network/natGateways@2023-09-01' = {
   name: natGatewayName

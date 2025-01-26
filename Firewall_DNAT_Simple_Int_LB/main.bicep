@@ -11,8 +11,12 @@ param vmNamePrefix string = 'BackendVM'
 @description('Location for all resources.')
 param location string = resourceGroup().location
 
-@description('Size of VM')
-param vmSize string = 'Standard_D2s_v5'
+@description('Specifies whether to use Overlake VM size or not.')
+@allowed([
+  'Overlake'
+  'Non-Overlake'
+])
+param vmSizeOption string
 
 @description('Virtual network address prefix')
 param vNetAddressPrefix string = '10.0.0.0/16'
@@ -49,6 +53,7 @@ param testVmName string = 'TestVM'
 param customImageResourceId string = '/subscriptions/8f8bee69-0b24-457d-a9af-3623095b0d78/resourceGroups/shaiknlab2/providers/Microsoft.Compute/galleries/shaikngallery/images/newvmdef/versions/0.0.1'
 
 var useCustomImageBool = useCustomImage == 'Yes' ? true : false 
+var vmSize = vmSizeOption == 'Overlake' ? 'Standard_D2s_v5' : 'Standard_D2s_v4'
 
 var natGatewayName = 'lb-nat-gateway'
 var natGatewayPublicIPAddressName = 'lb-nat-gateway-ip'

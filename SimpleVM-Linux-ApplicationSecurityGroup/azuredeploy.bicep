@@ -7,14 +7,22 @@
 
 @description('Specifies the base URI where artifacts required by this template are located including a SAS Token for install_nginx.sh')
 //  param _artifactsLocation string = deployment().properties.templateLink.uri
-param scriptFileUri string
+param scriptFileUri string 
 
 
 @description('VM Name')
 param vmName string = 'VM'
 
-@description('VM Size')
-param vmSize string = 'Standard_D2_v3'
+// @description('VM Size')
+// param vmSize string = 'Standard_D2_v3'
+
+
+@description('Specifies whether to use Overlake VM size or not.')
+@allowed([
+  'Overlake'
+  'Non-Overlake'
+])
+param vmSizeOption string
 
 @description('Administrator name')
 param adminUsername string
@@ -63,6 +71,8 @@ var linuxConfiguration = {
     ]
   }
 }
+
+var vmSize = vmSizeOption == 'Overlake' ? 'Standard_D2s_v5' : 'Standard_D2s_v4'
 
 resource asg 'Microsoft.Network/applicationSecurityGroups@2020-05-01' = {
   name: asgName
