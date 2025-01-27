@@ -180,6 +180,9 @@ resource vnetPeering 'Microsoft.Network/virtualNetworks/virtualNetworkPeerings@2
     }
     dependsOn: [
       vNet
+      hubVnet
+      vNetName_bastionSubnet
+      vNetName_vNetSubnetName
     ]
 }
 
@@ -197,7 +200,10 @@ resource hubVnetPeering 'Microsoft.Network/virtualNetworks/virtualNetworkPeering
     useRemoteGateways: false
   }
   dependsOn: [
+    vNet
     hubVnet
+    vNetName_bastionSubnet
+    vNetName_vNetSubnetName
   ]
 }
 
