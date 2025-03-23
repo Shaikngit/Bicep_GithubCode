@@ -1,5 +1,4 @@
-# SimpleVM-Linux
-
+# Simple_Pub_LB
 This repository contains a Bicep template to to create a public Azure load balancer
 
 The public load balancer distributes traffic to virtual machines in a virtual network located in the load balancer's backend pool. 

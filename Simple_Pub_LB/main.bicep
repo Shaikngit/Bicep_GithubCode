@@ -154,6 +154,28 @@ resource bastionPublicIPAddress 'Microsoft.Network/publicIPAddresses@2023-09-01'
   }
 }
 
+resource nsg 'Microsoft.Network/networkSecurityGroups@2023-09-01' = {
+  name: 'backend-nsg'
+  location: location
+  properties: {
+    securityRules: [
+      {
+        name: 'Allow-HTTP-Inbound'
+        properties: {
+          protocol: 'Tcp'
+          sourcePortRange: '*'
+          destinationPortRange: '80'
+          sourceAddressPrefix: 'Internet'
+          destinationAddressPrefix: '*'
+          access: 'Allow'
+          priority: 100
+          direction: 'Inbound'
+        }
+      }
+    ]
+  }
+}
+
 resource networkInterface 'Microsoft.Network/networkInterfaces@2023-09-01' = [for i in range(0, numberOfInstances): {
   name: '${networkInterfaceName}${i}'
   location: location
@@ -174,6 +196,9 @@ resource networkInterface 'Microsoft.Network/networkInterfaces@2023-09-01' = [fo
         }
       }
     ]
+    networkSecurityGroup: {
+      id: nsg.id
+    }
   }
   dependsOn: [
     loadBalancer
@@ -312,7 +337,7 @@ resource vmExtension 'Microsoft.Compute/virtualMachines/extensions@2021-11-01' =
     typeHandlerVersion: '1.9'
     autoUpgradeMinorVersion: true
     protectedSettings: {
-      commandToExecute: 'powershell -ExecutionPolicy Unrestricted Install-WindowsFeature -Name Web-Server'
+      commandToExecute: 'powershell -ExecutionPolicy Unrestricted Install-WindowsFeature -Name Web-Server -IncludeManagementTools'
     }
   }
 }]
@@ -332,6 +357,9 @@ resource testVmNetworkInterface 'Microsoft.Network/networkInterfaces@2023-09-01'
         }
       }
     ]
+    networkSecurityGroup: {
+      id: nsg.id
+    }
   }
 }
 
