@@ -22,7 +22,7 @@ To deploy the resources defined in the `main.bicep` file, use the following comm
 
 az group create --name <resourcegroupname> --location <location>
 
-az deployment group create --resource-group <resourcegroupname> --template-file main.bicep --query properties.outputs.publicIpAddress.value
+az deployment group create --resource-group <resourcegroupname> --template-file main.bicep --parameters useCustomImage=Yes
 ```
 
 ## Input 
