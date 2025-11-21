@@ -1,33 +1,108 @@
-# AzureFirewall DNAT rule to backend pool of Internal Load Balancer
+# Azure Firewall DNAT with Internal Load Balancer Lab 🛡️
 
-This repository contains a Bicep template to to create a Azure Firewall Standard with Firewall policy to create a DNAT rule to Internal Azure load balancer
+## Overview
 
-The internal load balancer distributes traffic to virtual machines in a virtual network located in the load balancer's backend pool. 
+This lab demonstrates a **complete Azure Firewall deployment with DNAT (Destination Network Address Translation) rules** directing traffic to an internal load balancer backend pool. The solution provides secure, controlled internet access to internal services through Azure Firewall with policy-based traffic management and internal load balancing for high availability.
 
-Along with the internal load balancer, this template creates a virtual network, network interfaces, a NAT Gateway, and an Azure Bastion instance
+## 🏗️ Architecture
 
-## Prerequisites
+```
+                               Internet
+                                  │
+                                  ▼
+                    ┌─────────────────────────────┐
+                    │     Azure Firewall           │
+                    │    (Hub Network)             │
+                    │   192.168.2.0/24             │
+                    │                              │
+                    │  DNAT Rules:                │
+                    │  • Port 80 → Int LB:80     │
+                    │  • Port 443 → Int LB:443   │
+                    └─────────────────────────────┘
+                                  │
+                                  ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                         Hub Virtual Network                         │
+│                        192.168.0.0/16                             │
+│                                                                     │
+│                               │                                     │
+│                               ▼                                     │
+│                    ┌─────────────────────┐                         │
+│                    │   VNet Peering      │                         │
+│                    └─────────────────────┘                         │
+└─────────────────────────────────────────────────────────────────────┘
+                                  │
+                                  ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                       Spoke Virtual Network                         │
+│                         10.0.0.0/16                               │
+│                                                                     │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │               Backend Subnet                                │   │
+│  │                10.0.0.0/24                                  │   │
+│  │                                                             │   │
+│  │  ┌─────────────────────────────────────────────────────┐   │   │
+│  │  │           Internal Load Balancer                    │   │   │
+│  │  │              (lb-internal)                          │   │   │
+│  │  │           Private IP: 10.0.0.6                     │   │   │
+│  │  │                                                     │   │   │
+│  │  │  Frontend: 10.0.0.6:80                            │   │   │
+│  │  │  Backend Pool: BackendVM1, BackendVM2             │   │   │
+│  │  │  Health Probe: HTTP :80                           │   │   │
+│  │  └─────────────────────────────────────────────────────┘   │   │
+│  │                     │              │                       │   │
+│  │                     ▼              ▼                       │   │
+│  │  ┌─────────────────┐              ┌─────────────────┐      │   │
+│  │  │  BackendVM1     │              │  BackendVM2     │      │   │
+│  │  │                 │              │                 │      │   │
+│  │  │ • Windows Server│              │ • Windows Server│      │   │
+│  │  │ • IIS Web Server│              │ • IIS Web Server│      │   │
+│  │  │ • Private IP    │              │ • Private IP    │      │   │
+│  │  └─────────────────┘              └─────────────────┘      │   │
+│  │                                                             │   │
+│  │  ┌─────────────────┐                                       │   │
+│  │  │    TestVM       │                                       │   │
+│  │  │                 │                                       │   │
+│  │  │ • Client VM     │                                       │   │
+│  │  │ • Testing Tool  │                                       │   │
+│  │  └─────────────────┘                                       │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+│                                                                     │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │                Azure Bastion                                │   │
+│  │           (AzureBastionSubnet)                              │   │
+│  │              10.0.2.0/24                                    │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────┘
 
-- Azure subscription
-- Azure CLI installed
-- Bicep CLI installed
+Traffic Flow: Internet ──► Firewall DNAT ──► VNet Peering ──► Internal LB ──► Backend VMs
+Management: Azure Bastion ──► All VMs (RDP)
+```
 
-## Deployment
+### Key Components
 
-To deploy the VM, follow these steps:
+- **Azure Firewall Standard**: Policy-based firewall with DNAT rules
+- **Firewall Policy**: Centralized rule management with DNAT configuration
+- **Hub-Spoke Topology**: Separated security and workload networks
+- **Internal Load Balancer**: Private IP load balancing for backend services
+- **VNet Peering**: Secure connectivity between hub and spoke networks
+- **Azure Bastion**: Secure management access to all VMs
 
-1. Clone the repository:
-    ```sh
-    git clone https://github.com/yourusername/Firewall_DNAT_Simple_Int_LB
-    cd Firewall_DNAT_Simple_Int_LB
-    ```
+## 🔧 Prerequisites
 
-2. Log in to your Azure account:
-    ```sh
-    az login
-    ```
+- Azure CLI installed and configured
+- Azure Bicep CLI extension
+- Valid Azure subscription with Firewall permissions
+- Understanding of hub-spoke networking and DNAT concepts
 
-3. Create a resource group:
+## 🚀 Quick Start
+
+### 1. Clone and Navigate
+```powershell
+cd C:\Bicep_GithubCode\Firewall_DNAT_Simple_Int_LB
+```
+
+### 2. Deploy the Lab
     ```sh
     az group create --name myResourceGroup --location eastus
     ```

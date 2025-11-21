@@ -1,25 +1,265 @@
+# 🗃️ Storage Account Private Endpoint
+
+[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FAzure%2Fazure-quickstart-templates%2Fmaster%2Fquickstarts%2Fmicrosoft.storage%2Fstorage-blob-container-private-endpoint%2Fazuredeploy.json)
+
+## 🎯 Overview
+
+This Bicep template demonstrates how to create a Linux Virtual Machine in a virtual network that privately accesses a blob storage account using Azure Private Endpoint. The solution showcases secure, private connectivity to Azure Storage without exposing traffic to the public internet.
+
+## 🏛️ Architecture
+
+```
+    Internet
+        │
+        ▼
+    ┌─────────┐
+    │Public IP│
+    └────┬────┘
+         │
+┌────────▼─────────────────────────────────┐
+│           Virtual Network                │
+│         (10.0.0.0/16)                   │
+│                                         │
+│  ┌─────────────────────────────────────┐ │
+│  │        Default Subnet               │ │
+│  │         (10.0.0.0/24)               │ │
+│  │                                     │ │
+│  │    ┌─────────┐                      │ │
+│  │    │Linux VM │ (SSH Access)         │ │
+│  │    └─────────┘                      │ │
+│  │         │                           │ │
+│  │         │ (Private DNS Resolution)  │ │
+│  │         ▼                           │ │
+│  │    ┌─────────────────┐              │ │
+│  │    │Private Endpoint │              │ │
+│  │    │(Storage Access) │              │ │
+│  │    └─────────────────┘              │ │
+│  └─────────────────────────────────────┘ │
+└─────────────────────────────────────────┘
+         │
+         ▼ (Private Connection)
+┌─────────────────────────────────────────┐
+│      Azure Storage Account              │
+│    (Blob + ADLS Gen2 Enabled)          │
+│                                         │
+│  ┌─────────────────────────────────────┐ │
+│  │      Private DNS Zone               │ │
+│  │  privatelink.blob.core.windows.net  │ │
+│  │  privatelink.dfs.core.windows.net   │ │
+│  └─────────────────────────────────────┘ │
+└─────────────────────────────────────────┘
+```
+
+## 📋 Features
+
+- **Azure Private Endpoint**: Secure private connectivity to Storage Account
+- **ADLS Gen2 Storage**: Azure Data Lake Storage with hierarchical namespace
+- **Private DNS Integration**: Automatic DNS resolution for private endpoints
+- **Linux Test VM**: Ubuntu VM for connectivity testing and validation
+- **Custom Script Extension**: Automated setup and testing scripts
+- **Log Analytics**: Monitoring and diagnostics for VM health
+- **Managed Identity**: Secure authentication without stored credentials
+- **Network Security**: NSG rules for secure SSH access
+
+## 🔧 Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| adminUsername | string | azadmin | Administrator username for VM |
+| authenticationType | string | sshPublicKey | Authentication type (sshPublicKey/password) |
+| adminPasswordOrKey | securestring | - | SSH public key or password |
+| vmName | string | TestVm | Name of the test virtual machine |
+| vmSize | string | Standard_DS1_v2 | Size of the virtual machine |
+| diskType | string | Premium_LRS | OS disk type |
+| location | string | resourceGroup().location | Deployment location |
+| vNetName | string | VNet | Virtual network name |
+| vNetAddressPrefix | string | 10.0.0.0/16 | VNet address space |
+| subnetName | string | Subnet | Subnet name |
+| subnetAddressPrefix | string | 10.0.0.0/24 | Subnet address space |
+| storageAccountName | string | [generated] | Unique storage account name |
+| blobStorageAccountPrivateEndpointName | string | BlobStorageAccountPrivateEndpoint | Blob PE name |
+| adlsStorageAccountPrivateEndpointName | string | AdlsStorageAccountPrivateEndpoint | ADLS PE name |
+
+## 🚀 Quick Deploy
+
+### Azure CLI
+```bash
+# Create resource group
+az group create --name rg-storage-pe --location eastus
+
+# Deploy template with SSH key
+az deployment group create \
+  --resource-group rg-storage-pe \
+  --template-file azuredeploy.bicep \
+  --parameters adminUsername="azureuser" \
+               authenticationType="sshPublicKey" \
+               adminPasswordOrKey="$(cat ~/.ssh/id_rsa.pub)"
+```
+
+### PowerShell
+```powershell
+# Create resource group
+New-AzResourceGroup -Name "rg-storage-pe" -Location "East US"
+
+# Deploy template
+New-AzResourceGroupDeployment `
+  -ResourceGroupName "rg-storage-pe" `
+  -TemplateFile "azuredeploy.bicep" `
+  -adminUsername "azureuser" `
+  -authenticationType "password" `
+  -adminPasswordOrKey (ConvertTo-SecureString "SecureP@ssw0rd123!" -AsPlainText -Force)
+```
+
+## 🧪 Testing & Validation
+
+### 1. Connect to VM
+```bash
+# SSH to the test VM
+ssh azureuser@<vm-public-ip>
+```
+
+### 2. Test Private DNS Resolution
+```bash
+# Test blob storage DNS resolution
+nslookup <storageaccount>.blob.core.windows.net
+
+# Test ADLS Gen2 DNS resolution  
+nslookup <storageaccount>.dfs.core.windows.net
+
+# Both should resolve to private IP addresses (10.0.x.x)
+```
+
+### 3. Test Storage Access
+```bash
+# Install Azure CLI (if not already done by script)
+curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+
+# Login with managed identity
+az login --identity
+
+# Test blob operations
+az storage blob list --account-name <storageaccount> --container-name test --auth-mode login
+
+# Test ADLS operations
+az storage fs create --name testfs --account-name <storageaccount> --auth-mode login
+```
+
+### 4. Network Connectivity Tests
+```bash
+# Test private endpoint connectivity
+curl -I https://<storageaccount>.blob.core.windows.net
+traceroute <storageaccount>.blob.core.windows.net
+
+# Verify no internet routing to storage
+```
+
+## 🔒 Security Features
+
+- ✅ Private endpoint ensures traffic stays within Azure backbone
+- ✅ No public internet access to storage account
+- ✅ Private DNS zones for proper name resolution
+- ✅ Managed identity for secure authentication
+- ✅ Network Security Groups for SSH access control
+- ✅ Storage account public access disabled
+- ✅ Firewall rules allow only VNet access
+
+## 🏷️ Resource Tags
+
+All resources are tagged with:
+- Environment: Demo
+- Project: Storage-Private-Endpoint
+- Purpose: Connectivity-Testing
+
+## 💰 Cost Optimization
+
+- **Storage Account**: Pay-as-you-use pricing
+- **Private Endpoint**: ~$7.30/month per endpoint
+- **VM**: ~$52/month (Standard_DS1_v2)
+- **Log Analytics**: Pay-per-GB ingested
+- **Bandwidth**: No charges for VNet traffic
+
+## 📊 Monitoring
+
+### Key Metrics
+- VM performance and availability
+- Private endpoint connection status
+- Storage account metrics (transactions, latency)
+- Network Security Group flow logs
+
+### Log Analytics Queries
+```kusto
+// VM performance
+Perf
+| where Computer == "TestVm"
+| where CounterName == "% Processor Time"
+| summarize avg(CounterValue) by bin(TimeGenerated, 5m)
+
+// Storage access logs
+StorageBlobLogs
+| where AccountName == "<storageaccount>"
+| summarize count() by bin(TimeGenerated, 1h), OperationName
+```
+
+## 🔧 Customization
+
+### Multiple Storage Services
+Add private endpoints for additional services:
+- Queue storage (privatelink.queue.core.windows.net)
+- Table storage (privatelink.table.core.windows.net)
+- File storage (privatelink.file.core.windows.net)
+
+### Enhanced Security
+- Implement Azure Bastion for VM access
+- Add Azure Firewall for additional protection
+- Configure storage encryption with customer-managed keys
+
+### Automation Scripts
+Located in `/scripts/` directory:
+- `nslookup.sh`: DNS resolution testing
+- Custom deployment scripts
+
+## 🚨 Troubleshooting
+
+### DNS Resolution Issues
+```bash
+# Check DNS configuration
+cat /etc/resolv.conf
+systemctl status systemd-resolved
+
+# Test DNS resolution manually
+dig <storageaccount>.blob.core.windows.net
+```
+
+### Storage Access Problems
+```bash
+# Verify managed identity assignment
+az role assignment list --assignee $(az account show --query id -o tsv)
+
+# Check storage account configuration
+az storage account show --name <storageaccount> --query "networkAcls"
+```
+
+### Network Connectivity Issues
+```bash
+# Test private endpoint connectivity
+nc -zv <private-ip> 443
+telnet <private-ip> 443
+
+# Check route table
+route -n
+ip route show
+```
+
+## 📚 Related Resources
+
+- [Azure Private Link Documentation](https://docs.microsoft.com/azure/private-link/)
+- [Azure Storage Private Endpoints](https://docs.microsoft.com/azure/storage/common/storage-private-endpoints)
+- [Private DNS Zones](https://docs.microsoft.com/azure/dns/private-dns-overview)
+- [ADLS Gen2 Documentation](https://docs.microsoft.com/azure/storage/blobs/data-lake-storage-introduction)
+
 ---
-description: This sample shows how to use connect a virtual network to access a blob storage account via private endpoint.
-page_type: sample
-products:
-- azure
-- azure-resource-manager
-urlFragment: blob-storage-private-endpoint
-languages:
-- json
----
-# Connect to a storage account from a VM via private endpoint
 
-
-This sample demonstrates how to create a Linux Virtual Machine in a virtual network that privately accesses a blob storage account using an [Azure Private Endpoint](https://docs.microsoft.com/azure/private-link/private-endpoint-overview). Azure Private Endpoint is a network interface that connects you privately and securely to a service powered by Azure Private Link. Private Endpoint uses a private IP address from your virtual network, effectively bringing the service into your virtual network. The service could be an Azure service such as Azure Storage, Azure Cosmos DB, SQL, etc. or your own Private Link Service. For more information, see [What is Azure Private Link?](https://docs.microsoft.com/azure/private-link/private-link-overview). For more information on the DNS configuration of a private endpoint, see [Azure Private Endpoint DNS configuration](https://docs.microsoft.com/azure/private-link/private-endpoint-dns).
-
-## Architecture ##
-
-The following picture shows the architecture and network topology of the sample.
-
-![Architecture](images/architecture.png)
-
-The BICEP template deploys the following resources:
+*This template demonstrates secure, private connectivity patterns for Azure Storage using Private Link technology.*
 
 - Virtual Network: this virtual network has a single subnet that hosts a Linux (Ubuntu) virtual machine
 - Network Security Group: this resource contains an inbound rule to allow access to the virtual machine on port 22 (SSH)

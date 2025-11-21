@@ -1,6 +1,10 @@
-# VM_VM_SameVnet Bicep Deployment Guide
+# 🖥️ Two VMs in Same Virtual Network
 
-This Bicep template deploys two Azure Virtual Machines (VMs) in the same Virtual Network (VNet). You can choose between Windows or Linux VMs and optionally use a custom image.
+[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FAzure%2Fazure-quickstart-templates%2Fmaster%2Fquickstarts%2Fmicrosoft.compute%2F2-vms-internal-load-balancer%2Fazuredeploy.json)
+
+## 🎯 Overview
+
+This Bicep template deploys two Windows virtual machines in the same virtual network, demonstrating inter-VM connectivity, shared networking resources, and multi-VM scenarios within a single network boundary.
 
 ## Prerequisites
 - Azure CLI installed and logged in (`az login`)
