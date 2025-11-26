@@ -26,9 +26,6 @@ param useCustomImage string = 'No'
 @description('The resource ID of the custom image to use if useCustomImage is true.')
 param customImageResourceId string = '/subscriptions/8f8bee69-0b24-457d-a9af-3623095b0d78/resourceGroups/shaiknlab2/providers/Microsoft.Compute/galleries/shaikngallery/images/newvmdef/versions/0.0.1'
 
-@description('The allowed IP address for RDP access.')
-param allowedRdpSourceAddress string
-
 var useCustomImageBool = useCustomImage == 'Yes' ? true : false 
 var vmSize = vmSizeOption == 'Overlake' ? 'Standard_D2s_v5' : 'Standard_D2s_v4'
 var vnetName = 'myVirtualNetwork'
@@ -40,6 +37,10 @@ var backendSubnetPrefix = '10.0.2.0/24'
 var backendSubnetName = 'backendSubnet'
 var consumerSubnetPrefix = '10.0.0.0/24'
 var consumerSubnetName = 'myPESubnet'
+var bastionSubnetPrefix = '10.0.3.0/26'
+var bastionSubnetName = 'AzureBastionSubnet'
+var bastionName = 'myBastion'
+var bastionPublicIpName = 'myBastionPublicIP'
 var loadbalancerName = 'myILB'
 var backendPoolName = 'myBackEndPool'
 var loadBalancerFrontEndIpConfigurationName = 'myFrontEnd'
@@ -48,7 +49,6 @@ var privateEndpointName = 'myPrivateEndpoint'
 var vmName = take('mySvcVm${uniqueString(resourceGroup().id)}', 15)
 var networkInterfaceName = '${vmName}NetInt'
 var vmConsumerName = take('myCnsmrvm${uniqueString(resourceGroup().id)}', 15)
-var publicIpAddressConsumerName = '${vmConsumerName}PublicIP'
 var networkInterfaceConsumerName = '${vmConsumerName}NetInt'
 var osDiskType = 'StandardSSD_LRS'
 var privatelinkServiceName = 'myPLS'
@@ -102,20 +102,6 @@ resource loadbalancer 'Microsoft.Network/loadBalancers@2021-05-01' = {
     backendAddressPools: [
       {
         name: backendPoolName
-      }
-    ]
-    inboundNatRules: [
-      {
-        name: 'RDP-VM0'
-        properties: {
-          frontendIPConfiguration: {
-            id: resourceId('Microsoft.Network/loadBalancers/frontendIpConfigurations', loadbalancerName, loadBalancerFrontEndIpConfigurationName)
-          }
-          protocol: 'Tcp'
-          frontendPort: 3389
-          backendPort: 3389
-          enableFloatingIP: false
-        }
       }
     ]
     loadBalancingRules: [
@@ -175,11 +161,6 @@ resource networkInterface 'Microsoft.Network/networkInterfaces@2021-05-01' = {
               id: resourceId('Microsoft.Network/loadBalancers/backendAddressPools', loadbalancerName, backendPoolName)
             }
           ]
-          loadBalancerInboundNatRules: [
-            {
-              id: resourceId('Microsoft.Network/loadBalancers/inboundNatRules/', loadbalancerName, 'RDP-VM0')
-            }
-          ]
         }
       }
     ]
@@ -189,13 +170,14 @@ resource networkInterface 'Microsoft.Network/networkInterfaces@2021-05-01' = {
   ]
 }
 
-resource nsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
+// NSG for VMs - allows RDP only from Azure Bastion subnet
+resource nsg 'Microsoft.Network/networkSecurityGroups@2021-05-01' = {
   name: 'myNsg'
   location: location
   properties: {
     securityRules: [
       {
-        name: 'AllowRDP'
+        name: 'AllowBastionRDP'
         properties: {
           priority: 1000
           direction: 'Inbound'
@@ -203,7 +185,33 @@ resource nsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
           protocol: 'Tcp'
           sourcePortRange: '*'
           destinationPortRange: '3389'
-          sourceAddressPrefix: allowedRdpSourceAddress
+          sourceAddressPrefix: bastionSubnetPrefix
+          destinationAddressPrefix: '*'
+        }
+      }
+      {
+        name: 'AllowBastionSSH'
+        properties: {
+          priority: 1010
+          direction: 'Inbound'
+          access: 'Allow'
+          protocol: 'Tcp'
+          sourcePortRange: '*'
+          destinationPortRange: '22'
+          sourceAddressPrefix: bastionSubnetPrefix
+          destinationAddressPrefix: '*'
+        }
+      }
+      {
+        name: 'DenyAllInbound'
+        properties: {
+          priority: 4096
+          direction: 'Inbound'
+          access: 'Deny'
+          protocol: '*'
+          sourcePortRange: '*'
+          destinationPortRange: '*'
+          sourceAddressPrefix: 'Internet'
           destinationAddressPrefix: '*'
         }
       }
@@ -322,24 +330,56 @@ resource vnetConsumer 'Microsoft.Network/virtualNetworks@2021-05-01' = {
           addressPrefix: backendSubnetPrefix
         }
       }
+      {
+        name: bastionSubnetName
+        properties: {
+          addressPrefix: bastionSubnetPrefix
+        }
+      }
     ]
   }
 }
 
-resource publicIpAddressConsumer 'Microsoft.Network/publicIPAddresses@2021-05-01' = {
-  name: publicIpAddressConsumerName
+// Azure Bastion Public IP
+resource bastionPublicIp 'Microsoft.Network/publicIPAddresses@2021-05-01' = {
+  name: bastionPublicIpName
   location: location
-  tags: {
-    displayName: publicIpAddressConsumerName
+  sku: {
+    name: 'Standard'
   }
   properties: {
-    publicIPAllocationMethod: 'Dynamic'
-    dnsSettings: {
-      domainNameLabel: toLower(vmConsumerName)
-    }
+    publicIPAllocationMethod: 'Static'
   }
 }
 
+// Azure Bastion Host
+resource bastion 'Microsoft.Network/bastionHosts@2021-05-01' = {
+  name: bastionName
+  location: location
+  sku: {
+    name: 'Basic'
+  }
+  properties: {
+    ipConfigurations: [
+      {
+        name: 'bastionIpConfig'
+        properties: {
+          subnet: {
+            id: resourceId('Microsoft.Network/virtualNetworks/subnets', vnetConsumerName, bastionSubnetName)
+          }
+          publicIPAddress: {
+            id: bastionPublicIp.id
+          }
+        }
+      }
+    ]
+  }
+  dependsOn: [
+    vnetConsumer
+  ]
+}
+
+// Consumer VM NIC - No public IP, only private connectivity via Bastion
 resource networkInterfaceConsumer 'Microsoft.Network/networkInterfaces@2021-05-01' = {
   name: networkInterfaceConsumerName
   location: location
@@ -352,13 +392,9 @@ resource networkInterfaceConsumer 'Microsoft.Network/networkInterfaces@2021-05-0
         name: 'ipConfig1'
         properties: {
           privateIPAllocationMethod: 'Dynamic'
-          publicIPAddress: {
-            id: publicIpAddressConsumer.id
-          }
           subnet: {
             id: resourceId('Microsoft.Network/virtualNetworks/subnets', vnetConsumerName, consumerSubnetName)
           }
-          
         }
       }
     ]
