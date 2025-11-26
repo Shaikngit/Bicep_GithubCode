@@ -1,130 +1,134 @@
-#Requires -Version 7.0
-
-<#
-.SYNOPSIS
-    Cleanup script for Azure Firewall DNAT + Internal LB deployment
-
-.DESCRIPTION
-    This script removes all resources created by the Firewall DNAT deployment.
-    WARNING: This is a high-cost deployment - ensure you want to delete everything.
-
-.PARAMETER ResourceGroupName
-    Name of the resource group to clean up (default: rg-firewall-dnat-intlb)
-
-.PARAMETER Force
-    Skip confirmation prompts and delete immediately
-
-.PARAMETER WhatIf
-    Show what would be deleted without actually deleting
-
-.EXAMPLE
-    .\cleanup.ps1
-
-.EXAMPLE
-    .\cleanup.ps1 -Force
-#>
+# ============================================================================
+# Azure Resource Group Cleanup Script
+# ============================================================================
+# This script deletes all resources in the specified resource group
+# ============================================================================
 
 param(
-    [Parameter(Mandatory=$false)]
-    [string]$ResourceGroupName = "rg-firewall-dnat-intlb",
-    
-    [Parameter(Mandatory=$false)]
-    [switch]$Force,
-    
-    [Parameter(Mandatory=$false)]
-    [switch]$WhatIf
+    [Parameter(Mandatory = $true)]
+    [string]$ResourceGroupName,
+
+    [Parameter(Mandatory = $false)]
+    [switch]$Force
 )
 
-function Write-ColorOutput {
-    param([string]$Message, [string]$Color = "White")
-    $colors = @{ "Red" = [ConsoleColor]::Red; "Green" = [ConsoleColor]::Green; "Yellow" = [ConsoleColor]::Yellow; "Cyan" = [ConsoleColor]::Cyan; "White" = [ConsoleColor]::White; "Magenta" = [ConsoleColor]::Magenta }
-    Write-Host $Message -ForegroundColor $colors[$Color]
+# ============================================================================
+# Functions
+# ============================================================================
+function Write-Log {
+    param([string]$Message, [string]$Level = "INFO")
+    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    $color = switch ($Level) {
+        "INFO"    { "White" }
+        "SUCCESS" { "Green" }
+        "WARNING" { "Yellow" }
+        "ERROR"   { "Red" }
+        default   { "White" }
+    }
+    Write-Host "[$timestamp] [$Level] $Message" -ForegroundColor $color
 }
 
-Write-ColorOutput "🧹 Firewall DNAT + Internal LB Cleanup Script" "Magenta"
-Write-ColorOutput "=============================================" "Magenta"
-
-# Check prerequisites
-try {
-    $account = az account show --output json 2>$null | ConvertFrom-Json
-    Write-ColorOutput "✅ Logged into Azure as: $($account.user.name)" "Green"
-} catch {
-    Write-ColorOutput "❌ Not logged into Azure. Please run 'az login'." "Red"
-    exit 1
+function Test-AzureLogin {
+    try {
+        $context = Get-AzContext
+        if (-not $context) {
+            Write-Log "Not logged into Azure. Please run 'Connect-AzAccount' first." "ERROR"
+            exit 1
+        }
+        Write-Log "Logged in as: $($context.Account.Id)" "SUCCESS"
+        return $true
+    }
+    catch {
+        Write-Log "Error checking Azure login: $_" "ERROR"
+        exit 1
+    }
 }
+
+# ============================================================================
+# Main Script
+# ============================================================================
+Write-Log "========================================" "INFO"
+Write-Log "Azure Resource Group Cleanup" "INFO"
+Write-Log "========================================" "INFO"
+
+# Check Azure login
+Test-AzureLogin
 
 # Check if resource group exists
-$rgExists = az group exists --name $ResourceGroupName --output tsv
-if ($rgExists -eq "false") {
-    Write-ColorOutput "✅ Nothing to clean up - resource group doesn't exist" "Green"
+Write-Log "Checking resource group: $ResourceGroupName" "INFO"
+$rg = Get-AzResourceGroup -Name $ResourceGroupName -ErrorAction SilentlyContinue
+
+if (-not $rg) {
+    Write-Log "Resource group '$ResourceGroupName' does not exist. Nothing to clean up." "WARNING"
     exit 0
 }
 
-# Show comprehensive inventory
-Write-ColorOutput "📦 Analyzing resource group: $ResourceGroupName" "Cyan"
-$resources = az resource list --resource-group $ResourceGroupName --output json | ConvertFrom-Json
-Write-ColorOutput "📊 Resources found: $($resources.Count)" "White"
-
-if ($resources.Count -gt 0) {
-    Write-ColorOutput "🗂️  Detailed resource inventory:" "Cyan"
-    
-    # Group resources by type for better overview
-    $resourcesByType = $resources | Group-Object type | Sort-Object Name
-    foreach ($group in $resourcesByType) {
-        Write-ColorOutput "   📁 $($group.Name) ($($group.Count) resources):" "Yellow"
-        foreach ($resource in $group.Group) {
-            Write-ColorOutput "      • $($resource.name)" "White"
-        }
+# List resources in the resource group
+Write-Log "Resources in resource group:" "INFO"
+$resources = Get-AzResource -ResourceGroupName $ResourceGroupName
+if ($resources) {
+    foreach ($resource in $resources) {
+        Write-Log "  - $($resource.ResourceType): $($resource.Name)" "INFO"
     }
-    
-    # Calculate estimated monthly savings
-    $firewalls = ($resources | Where-Object { $_.type -like "*azureFirewalls*" }).Count
-    $vms = ($resources | Where-Object { $_.type -like "*virtualMachines*" }).Count
-    $bastion = ($resources | Where-Object { $_.type -like "*bastionHosts*" }).Count
-    $natgw = ($resources | Where-Object { $_.type -like "*natGateways*" }).Count
-    
-    $estimatedSavings = ($firewalls * 912) + ($vms * 35) + ($bastion * 140) + ($natgw * 45) + 25  # LB cost
-    
-    Write-ColorOutput "" "White"
-    Write-ColorOutput "💰 Estimated monthly cost savings after cleanup: ~$${estimatedSavings}" "Green"
+    Write-Log "Total resources: $($resources.Count)" "INFO"
+}
+else {
+    Write-Log "  No resources found" "INFO"
 }
 
-if ($WhatIf) {
-    Write-ColorOutput "🔍 What-if mode: All resources above would be deleted" "Yellow"
-    Write-ColorOutput "ℹ️  No resources were actually deleted (what-if mode)" "Yellow"
-    exit 0
-}
-
+# Confirm deletion
 if (-not $Force) {
-    Write-ColorOutput "⚠️  WARNING: This will permanently delete ALL resources in the resource group!" "Red"
-    Write-ColorOutput "⚠️  This includes expensive infrastructure like Azure Firewall, Bastion, and VMs!" "Red"
-    Write-ColorOutput "⚠️  This action cannot be undone!" "Red"
-    Write-ColorOutput "⚠️  Resource Group: $ResourceGroupName" "Yellow"
-    Write-ColorOutput "" "White"
+    Write-Log "" "INFO"
+    Write-Log "WARNING: This will delete ALL resources in the resource group!" "WARNING"
+    Write-Log "Resource Group: $ResourceGroupName" "WARNING"
+    Write-Log "Location: $($rg.Location)" "WARNING"
+    Write-Log "" "INFO"
     
-    $response = Read-Host "Are you absolutely sure you want to delete all resources? Type 'DELETE' to confirm"
-    if ($response -ne "DELETE") {
-        Write-ColorOutput "❌ Cleanup cancelled - confirmation not received" "Yellow"
+    $confirmation = Read-Host "Are you sure you want to delete this resource group? (yes/no)"
+    if ($confirmation -ne "yes") {
+        Write-Log "Cleanup cancelled by user." "INFO"
         exit 0
     }
 }
 
-Write-ColorOutput "🗑️  Starting comprehensive resource cleanup..." "Cyan"
-Write-ColorOutput "⏰ Start time: $(Get-Date)" "White"
-Write-ColorOutput "🗑️  Deleting resource group: $ResourceGroupName" "Yellow"
+# Delete resource group
+Write-Log "Deleting resource group: $ResourceGroupName" "INFO"
+Write-Log "This may take several minutes..." "INFO"
 
-az group delete --name $ResourceGroupName --yes --no-wait
-
-if ($LASTEXITCODE -eq 0) {
-    Write-ColorOutput "✅ Resource group deletion initiated successfully!" "Green"
-    Write-ColorOutput "ℹ️  Deletion is running in the background and may take 15-30 minutes" "Yellow"
-    Write-ColorOutput "ℹ️  This includes time for Azure Firewall and other complex resources" "Yellow"
-    Write-ColorOutput "ℹ️  Check status with: az group show --name $ResourceGroupName --query 'properties.provisioningState'" "Cyan"
-    Write-ColorOutput "" "White"
-    Write-ColorOutput "💰 You will stop incurring costs once deletion completes!" "Green"
-} else {
-    Write-ColorOutput "❌ Failed to delete resource group" "Red"
+try {
+    $startTime = Get-Date
+    Remove-AzResourceGroup -Name $ResourceGroupName -Force -AsJob | Out-Null
+    
+    # Monitor deletion progress
+    $jobComplete = $false
+    while (-not $jobComplete) {
+        Start-Sleep -Seconds 30
+        $rg = Get-AzResourceGroup -Name $ResourceGroupName -ErrorAction SilentlyContinue
+        if (-not $rg) {
+            $jobComplete = $true
+        }
+        else {
+            $elapsed = (Get-Date) - $startTime
+            Write-Log "Still deleting... ($([math]::Round($elapsed.TotalMinutes, 1)) minutes elapsed)" "INFO"
+        }
+    }
+    
+    $endTime = Get-Date
+    $duration = $endTime - $startTime
+    
+    Write-Log "========================================" "SUCCESS"
+    Write-Log "Cleanup completed successfully!" "SUCCESS"
+    Write-Log "Duration: $($duration.Minutes)m $($duration.Seconds)s" "SUCCESS"
+    Write-Log "========================================" "SUCCESS"
+    
+    # Clean up local files
+    $outputFile = Join-Path $PSScriptRoot "deployment-outputs.json"
+    if (Test-Path $outputFile) {
+        Remove-Item $outputFile -Force
+        Write-Log "Removed local deployment outputs file" "INFO"
+    }
+}
+catch {
+    Write-Log "Error during cleanup: $_" "ERROR"
     exit 1
 }
-
-Write-ColorOutput "🎉 Cleanup script completed!" "Green"

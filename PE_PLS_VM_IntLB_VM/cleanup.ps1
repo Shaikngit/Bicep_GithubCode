@@ -1,35 +1,134 @@
-#Requires -Version 7.0
+# ============================================================================
+# Azure Resource Group Cleanup Script
+# ============================================================================
+# This script deletes all resources in the specified resource group
+# ============================================================================
+
 param(
-    [Parameter(Mandatory=$false)][string]$ResourceGroupName = "rg-pe-pls-vm-intlb",
-    [Parameter(Mandatory=$false)][switch]$Force,
-    [Parameter(Mandatory=$false)][switch]$WhatIf
+    [Parameter(Mandatory = $true)]
+    [string]$ResourceGroupName,
+
+    [Parameter(Mandatory = $false)]
+    [switch]$Force
 )
 
-function Write-ColorOutput { param([string]$Message, [string]$Color = "White")
-    $colors = @{ "Red" = [ConsoleColor]::Red; "Green" = [ConsoleColor]::Green; "Yellow" = [ConsoleColor]::Yellow; "Cyan" = [ConsoleColor]::Cyan; "White" = [ConsoleColor]::White; "Magenta" = [ConsoleColor]::Magenta }
-    Write-Host $Message -ForegroundColor $colors[$Color] }
-
-Write-ColorOutput "🧹 Private Endpoint + Private Link Service Cleanup" "Magenta"
-Write-ColorOutput "================================================" "Magenta"
-
-$rgExists = az group exists --name $ResourceGroupName --output tsv
-if ($rgExists -eq "false") { Write-ColorOutput "✅ Nothing to clean up - resource group doesn't exist" "Green"; exit 0 }
-
-$resources = az resource list --resource-group $ResourceGroupName --output json | ConvertFrom-Json
-Write-ColorOutput "📦 Resource group: $ResourceGroupName ($($resources.Count) resources)" "Cyan"
-if ($resources.Count -gt 0) {
-    Write-ColorOutput "🗂️  Resources:" "Cyan"
-    foreach ($resource in $resources) { Write-ColorOutput "   • $($resource.type): $($resource.name)" "White" }
+# ============================================================================
+# Functions
+# ============================================================================
+function Write-Log {
+    param([string]$Message, [string]$Level = "INFO")
+    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    $color = switch ($Level) {
+        "INFO"    { "White" }
+        "SUCCESS" { "Green" }
+        "WARNING" { "Yellow" }
+        "ERROR"   { "Red" }
+        default   { "White" }
+    }
+    Write-Host "[$timestamp] [$Level] $Message" -ForegroundColor $color
 }
 
-if ($WhatIf) { Write-ColorOutput "🔍 What-if mode: Resources above would be deleted" "Yellow"; exit 0 }
+function Test-AzureLogin {
+    try {
+        $context = Get-AzContext
+        if (-not $context) {
+            Write-Log "Not logged into Azure. Please run 'Connect-AzAccount' first." "ERROR"
+            exit 1
+        }
+        Write-Log "Logged in as: $($context.Account.Id)" "SUCCESS"
+        return $true
+    }
+    catch {
+        Write-Log "Error checking Azure login: $_" "ERROR"
+        exit 1
+    }
+}
 
+# ============================================================================
+# Main Script
+# ============================================================================
+Write-Log "========================================" "INFO"
+Write-Log "Azure Resource Group Cleanup" "INFO"
+Write-Log "========================================" "INFO"
+
+# Check Azure login
+Test-AzureLogin
+
+# Check if resource group exists
+Write-Log "Checking resource group: $ResourceGroupName" "INFO"
+$rg = Get-AzResourceGroup -Name $ResourceGroupName -ErrorAction SilentlyContinue
+
+if (-not $rg) {
+    Write-Log "Resource group '$ResourceGroupName' does not exist. Nothing to clean up." "WARNING"
+    exit 0
+}
+
+# List resources in the resource group
+Write-Log "Resources in resource group:" "INFO"
+$resources = Get-AzResource -ResourceGroupName $ResourceGroupName
+if ($resources) {
+    foreach ($resource in $resources) {
+        Write-Log "  - $($resource.ResourceType): $($resource.Name)" "INFO"
+    }
+    Write-Log "Total resources: $($resources.Count)" "INFO"
+}
+else {
+    Write-Log "  No resources found" "INFO"
+}
+
+# Confirm deletion
 if (-not $Force) {
-    Write-ColorOutput "⚠️  WARNING: This will permanently delete ALL resources!" "Red"
-    $response = Read-Host "Type 'yes' to confirm deletion"
-    if ($response -ne "yes") { Write-ColorOutput "❌ Cleanup cancelled" "Yellow"; exit 0 }
+    Write-Log "" "INFO"
+    Write-Log "WARNING: This will delete ALL resources in the resource group!" "WARNING"
+    Write-Log "Resource Group: $ResourceGroupName" "WARNING"
+    Write-Log "Location: $($rg.Location)" "WARNING"
+    Write-Log "" "INFO"
+    
+    $confirmation = Read-Host "Are you sure you want to delete this resource group? (yes/no)"
+    if ($confirmation -ne "yes") {
+        Write-Log "Cleanup cancelled by user." "INFO"
+        exit 0
+    }
 }
 
-Write-ColorOutput "🗑️  Deleting resource group: $ResourceGroupName" "Yellow"
-az group delete --name $ResourceGroupName --yes --no-wait
-if ($LASTEXITCODE -eq 0) { Write-ColorOutput "✅ Deletion initiated successfully!" "Green" } else { Write-ColorOutput "❌ Failed to delete resource group" "Red"; exit 1 }
+# Delete resource group
+Write-Log "Deleting resource group: $ResourceGroupName" "INFO"
+Write-Log "This may take several minutes..." "INFO"
+
+try {
+    $startTime = Get-Date
+    Remove-AzResourceGroup -Name $ResourceGroupName -Force -AsJob | Out-Null
+    
+    # Monitor deletion progress
+    $jobComplete = $false
+    while (-not $jobComplete) {
+        Start-Sleep -Seconds 30
+        $rg = Get-AzResourceGroup -Name $ResourceGroupName -ErrorAction SilentlyContinue
+        if (-not $rg) {
+            $jobComplete = $true
+        }
+        else {
+            $elapsed = (Get-Date) - $startTime
+            Write-Log "Still deleting... ($([math]::Round($elapsed.TotalMinutes, 1)) minutes elapsed)" "INFO"
+        }
+    }
+    
+    $endTime = Get-Date
+    $duration = $endTime - $startTime
+    
+    Write-Log "========================================" "SUCCESS"
+    Write-Log "Cleanup completed successfully!" "SUCCESS"
+    Write-Log "Duration: $($duration.Minutes)m $($duration.Seconds)s" "SUCCESS"
+    Write-Log "========================================" "SUCCESS"
+    
+    # Clean up local files
+    $outputFile = Join-Path $PSScriptRoot "deployment-outputs.json"
+    if (Test-Path $outputFile) {
+        Remove-Item $outputFile -Force
+        Write-Log "Removed local deployment outputs file" "INFO"
+    }
+}
+catch {
+    Write-Log "Error during cleanup: $_" "ERROR"
+    exit 1
+}

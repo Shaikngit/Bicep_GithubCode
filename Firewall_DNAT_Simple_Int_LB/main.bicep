@@ -177,13 +177,11 @@ resource vnetPeering 'Microsoft.Network/virtualNetworks/virtualNetworkPeerings@2
     allowForwardedTraffic: true
     allowGatewayTransit: false
     useRemoteGateways: false
-    }
-    dependsOn: [
-      vNet
-      hubVnet
-      vNetName_bastionSubnet
-      vNetName_vNetSubnetName
-    ]
+  }
+  dependsOn: [
+    vNetName_bastionSubnet
+    vNetName_vNetSubnetName
+  ]
 }
 
 // Define VNET peering from Hub VNET to LB VNET
@@ -200,8 +198,6 @@ resource hubVnetPeering 'Microsoft.Network/virtualNetworks/virtualNetworkPeering
     useRemoteGateways: false
   }
   dependsOn: [
-    vNet
-    hubVnet
     vNetName_bastionSubnet
     vNetName_vNetSubnetName
   ]

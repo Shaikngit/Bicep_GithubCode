@@ -1,0 +1,67 @@
+{
+  "branchVpnConnectionNames": {
+    "type": "Array",
+    "value": [
+      "conn-Branch_A",
+      "conn-Branch_B"
+    ]
+  },
+  "hubVpnGatewayId": {
+    "type": "String",
+    "value": "/subscriptions/8f8bee69-0b24-457d-a9af-3623095b0d78/resourceGroups/rg-vwan-isolation-lab2/providers/Microsoft.Network/vpnGateways/vhub-test-vpngw"
+  },
+  "hubVpnGatewayName": {
+    "type": "String",
+    "value": "vhub-test-vpngw"
+  },
+  "routeTableNames": {
+    "type": "Object",
+    "value": {
+      "defaultRouteTable": "defaultRouteTable",
+      "routeTableA": "RouteTable_A",
+      "routeTableB": "RouteTable_B"
+    }
+  },
+  "virtualHubId": {
+    "type": "String",
+    "value": "/subscriptions/8f8bee69-0b24-457d-a9af-3623095b0d78/resourceGroups/rg-vwan-isolation-lab2/providers/Microsoft.Network/virtualHubs/vhub-test"
+  },
+  "virtualHubName": {
+    "type": "String",
+    "value": "vhub-test"
+  },
+  "virtualWanId": {
+    "type": "String",
+    "value": "/subscriptions/8f8bee69-0b24-457d-a9af-3623095b0d78/resourceGroups/rg-vwan-isolation-lab2/providers/Microsoft.Network/virtualWans/vwan-test"
+  },
+  "virtualWanName": {
+    "type": "String",
+    "value": "vwan-test"
+  },
+  "vmPrivateIps": {
+    "type": "Object",
+    "value": {
+      "vmA": "10.1.0.4",
+      "vmB": "10.2.0.4",
+      "vmBranchA": "10.10.0.4",
+      "vmBranchB": "10.20.0.4",
+      "vmC": "10.3.0.4"
+    }
+  },
+  "vnetConnectionNames": {
+    "type": "Array",
+    "value": [
+      "conn-VNet_A",
+      "conn-VNet_B",
+      "conn-VNet_C"
+    ]
+  },
+  "vpnGatewayPublicIps": {
+    "type": "Object",
+    "value": {
+      "branchAGatewayPip": "13.88.220.17",
+      "branchBGatewayPip": "20.205.12.132",
+      "hubVpnGatewayIp": "20.6.121.46"
+    }
+  }
+}
