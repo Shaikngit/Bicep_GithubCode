@@ -104,7 +104,7 @@ cd C:\Bicep_GithubCode\Firewall_DNAT_Simple_Int_LB
 
 ### 2. Deploy the Lab
     ```sh
-    az group create --name myResourceGroup --location eastus
+    az group create --name myResourceGroup --location southeastasia
     ```
 
 4. Deploy the Bicep template:

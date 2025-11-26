@@ -283,7 +283,7 @@ az deployment group create \
 
 3. Create a resource group:
     ```sh
-    az group create --name myResourceGroup --location eastus
+    az group create --name myResourceGroup --location southeastasia
     ```
 
 4. Deploy the Bicep template:
