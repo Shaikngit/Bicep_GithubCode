@@ -36,42 +36,45 @@ resource nsg 'Microsoft.Network/networkSecurityGroups@2023-09-01' = {
   properties: {
     securityRules: [
       {
-        name: 'AllowSSH'
+        name: 'AllowSSH-AzurePlatform'
         properties: {
           priority: 100
           protocol: 'Tcp'
           access: 'Allow'
           direction: 'Inbound'
-          sourceAddressPrefix: '*'
+          sourceAddressPrefix: '168.63.129.16'
           sourcePortRange: '*'
           destinationAddressPrefix: '*'
           destinationPortRange: '22'
+          description: 'Allow SSH from Azure platform for Bastion native client'
         }
       }
       {
-        name: 'AllowICMP'
+        name: 'AllowRDP-AzurePlatform'
+        properties: {
+          priority: 110
+          protocol: 'Tcp'
+          access: 'Allow'
+          direction: 'Inbound'
+          sourceAddressPrefix: '168.63.129.16'
+          sourcePortRange: '*'
+          destinationAddressPrefix: '*'
+          destinationPortRange: '3389'
+          description: 'Allow RDP from Azure platform for Bastion native client'
+        }
+      }
+      {
+        name: 'AllowICMP-VNet'
         properties: {
           priority: 200
           protocol: 'Icmp'
           access: 'Allow'
           direction: 'Inbound'
-          sourceAddressPrefix: '*'
+          sourceAddressPrefix: 'VirtualNetwork'
           sourcePortRange: '*'
           destinationAddressPrefix: '*'
           destinationPortRange: '*'
-        }
-      }
-      {
-        name: 'AllowRDP'
-        properties: {
-          priority: 300
-          protocol: 'Tcp'
-          access: 'Allow'
-          direction: 'Inbound'
-          sourceAddressPrefix: '*'
-          sourcePortRange: '*'
-          destinationAddressPrefix: '*'
-          destinationPortRange: '3389'
+          description: 'Allow ICMP from VNet for internal connectivity testing'
         }
       }
     ]

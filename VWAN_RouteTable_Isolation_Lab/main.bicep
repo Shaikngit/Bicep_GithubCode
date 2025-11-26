@@ -190,9 +190,23 @@ resource nsgVnets 'Microsoft.Network/networkSecurityGroups@2024-01-01' = [for (v
   properties: {
     securityRules: [
       {
-        name: 'Allow-SSH-From-Lab'
+        name: 'Allow-SSH-From-AzurePlatform'
         properties: {
           priority: 100
+          direction: 'Inbound'
+          access: 'Allow'
+          protocol: 'Tcp'
+          sourceAddressPrefix: '168.63.129.16'
+          sourcePortRange: '*'
+          destinationAddressPrefix: '*'
+          destinationPortRange: '22'
+          description: 'Allow SSH from Azure platform for Bastion native client'
+        }
+      }
+      {
+        name: 'Allow-SSH-From-Lab'
+        properties: {
+          priority: 110
           direction: 'Inbound'
           access: 'Allow'
           protocol: 'Tcp'
@@ -205,7 +219,7 @@ resource nsgVnets 'Microsoft.Network/networkSecurityGroups@2024-01-01' = [for (v
       {
         name: 'Allow-ICMP-From-Lab'
         properties: {
-          priority: 110
+          priority: 120
           direction: 'Inbound'
           access: 'Allow'
           protocol: 'Icmp'
@@ -218,7 +232,7 @@ resource nsgVnets 'Microsoft.Network/networkSecurityGroups@2024-01-01' = [for (v
       {
         name: 'Deny-SSH-From-Internet'
         properties: {
-          priority: 200
+          priority: 300
           direction: 'Inbound'
           access: 'Deny'
           protocol: 'Tcp'
@@ -540,9 +554,23 @@ resource nsgBranches 'Microsoft.Network/networkSecurityGroups@2024-01-01' = [for
   properties: {
     securityRules: [
       {
-        name: 'Allow-SSH-From-Lab'
+        name: 'Allow-SSH-From-AzurePlatform'
         properties: {
           priority: 100
+          direction: 'Inbound'
+          access: 'Allow'
+          protocol: 'Tcp'
+          sourceAddressPrefix: '168.63.129.16'
+          sourcePortRange: '*'
+          destinationAddressPrefix: '*'
+          destinationPortRange: '22'
+          description: 'Allow SSH from Azure platform for Bastion native client'
+        }
+      }
+      {
+        name: 'Allow-SSH-From-Lab'
+        properties: {
+          priority: 110
           direction: 'Inbound'
           access: 'Allow'
           protocol: 'Tcp'
@@ -555,7 +583,7 @@ resource nsgBranches 'Microsoft.Network/networkSecurityGroups@2024-01-01' = [for
       {
         name: 'Allow-ICMP-From-Lab'
         properties: {
-          priority: 110
+          priority: 120
           direction: 'Inbound'
           access: 'Allow'
           protocol: 'Icmp'
@@ -568,7 +596,7 @@ resource nsgBranches 'Microsoft.Network/networkSecurityGroups@2024-01-01' = [for
       {
         name: 'Deny-SSH-From-Internet'
         properties: {
-          priority: 200
+          priority: 300
           direction: 'Inbound'
           access: 'Deny'
           protocol: 'Tcp'

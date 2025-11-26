@@ -97,6 +97,14 @@ param vmConfig = {
   }
 }
 
+// Azure Bastion Configuration
+param bastionConfig = {
+  name: 'bastion-interhub-lab'
+  location: 'southeastasia'
+  vnetPrefix: '10.100.0.0/16'
+  subnetPrefix: '10.100.0.0/26'
+}
+
 // Resource Tags
 param tags = {
   Environment: 'Lab'

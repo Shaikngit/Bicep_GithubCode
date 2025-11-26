@@ -1,4 +1,20 @@
 {
+  "bastionId": {
+    "type": "String",
+    "value": "/subscriptions/8f8bee69-0b24-457d-a9af-3623095b0d78/resourceGroups/rg-vwan-isolation-labvthbastion/providers/Microsoft.Network/bastionHosts/bastion-vwan-lab"
+  },
+  "bastionName": {
+    "type": "String",
+    "value": "bastion-vwan-lab"
+  },
+  "bastionPublicIp": {
+    "type": "String",
+    "value": "4.194.44.70"
+  },
+  "bastionVnetName": {
+    "type": "String",
+    "value": "VNet_Bastion"
+  },
   "branchVpnConnectionNames": {
     "type": "Array",
     "value": [
@@ -8,7 +24,7 @@
   },
   "hubVpnGatewayId": {
     "type": "String",
-    "value": "/subscriptions/8f8bee69-0b24-457d-a9af-3623095b0d78/resourceGroups/rg-vwan-isolation-lab2/providers/Microsoft.Network/vpnGateways/vhub-test-vpngw"
+    "value": "/subscriptions/8f8bee69-0b24-457d-a9af-3623095b0d78/resourceGroups/rg-vwan-isolation-labvthbastion/providers/Microsoft.Network/vpnGateways/vhub-test-vpngw"
   },
   "hubVpnGatewayName": {
     "type": "String",
@@ -24,7 +40,7 @@
   },
   "virtualHubId": {
     "type": "String",
-    "value": "/subscriptions/8f8bee69-0b24-457d-a9af-3623095b0d78/resourceGroups/rg-vwan-isolation-lab2/providers/Microsoft.Network/virtualHubs/vhub-test"
+    "value": "/subscriptions/8f8bee69-0b24-457d-a9af-3623095b0d78/resourceGroups/rg-vwan-isolation-labvthbastion/providers/Microsoft.Network/virtualHubs/vhub-test"
   },
   "virtualHubName": {
     "type": "String",
@@ -32,7 +48,7 @@
   },
   "virtualWanId": {
     "type": "String",
-    "value": "/subscriptions/8f8bee69-0b24-457d-a9af-3623095b0d78/resourceGroups/rg-vwan-isolation-lab2/providers/Microsoft.Network/virtualWans/vwan-test"
+    "value": "/subscriptions/8f8bee69-0b24-457d-a9af-3623095b0d78/resourceGroups/rg-vwan-isolation-labvthbastion/providers/Microsoft.Network/virtualWans/vwan-test"
   },
   "virtualWanName": {
     "type": "String",
@@ -59,9 +75,9 @@
   "vpnGatewayPublicIps": {
     "type": "Object",
     "value": {
-      "branchAGatewayPip": "13.88.220.17",
-      "branchBGatewayPip": "20.205.12.132",
-      "hubVpnGatewayIp": "20.6.121.46"
+      "branchAGatewayPip": "23.101.2.31",
+      "branchBGatewayPip": "65.52.161.144",
+      "hubVpnGatewayIp": "135.171.193.2"
     }
   }
 }

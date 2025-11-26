@@ -105,6 +105,14 @@ param vmConfig object = {
 @secure()
 param adminPassword string
 
+@description('Azure Bastion configuration')
+param bastionConfig object = {
+  name: 'bastion-interhub-lab'
+  location: 'southeastasia'
+  vnetPrefix: '10.100.0.0/16'
+  subnetPrefix: '10.100.0.0/26'
+}
+
 @description('Tags to apply to all resources')
 param tags object = {
   Environment: 'Lab'
@@ -256,6 +264,24 @@ module spoke2 'modules/spoke.bicep' = {
 }
 
 // =============================================================================
+// AZURE BASTION FOR SECURE VM ACCESS
+// =============================================================================
+
+module bastion 'modules/bastion.bicep' = {
+  name: 'deploy-bastion-${deploymentPrefix}'
+  scope: resourceGroup
+  params: {
+    bastionConfig: bastionConfig
+    hubId: virtualHub1.outputs.hubId
+    tags: tags
+  }
+  dependsOn: [
+    spoke1
+    spoke2
+  ]
+}
+
+// =============================================================================
 // OUTPUTS
 // =============================================================================
 
@@ -323,6 +349,15 @@ output testCommands object = {
   pingVM2toVM1: 'ping ${spoke1.outputs.vmPrivateIP}'
   curlVM1toVM2: 'curl -v telnet://${spoke2.outputs.vmPrivateIP}:22'
   curlVM2toVM1: 'curl -v telnet://${spoke1.outputs.vmPrivateIP}:22'
+}
+
+@description('Azure Bastion details')
+output bastionDetails object = {
+  name: bastion.outputs.bastionName
+  publicIP: bastion.outputs.bastionPublicIP
+  vnetName: bastion.outputs.bastionVnetName
+  location: bastionConfig.location
+  connectCommand: 'az network bastion ssh --name ${bastion.outputs.bastionName} --resource-group ${resourceGroupName} --target-resource-id <vm-resource-id> --auth-type password --username ${vmConfig.adminUsername}'
 }
 
 @description('Resource group name')
