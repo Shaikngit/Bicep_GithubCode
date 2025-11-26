@@ -86,7 +86,7 @@ function Test-TemplateValidation {
     # Create temp resource group for validation
     $tempRg = "rg-firewall-dnat-validate-temp"
     Write-ColorOutput "📦 Creating temporary validation resource group..." "Yellow"
-    az group create --name $tempRg --location "eastus" --output none
+    az group create --name $tempRg --location "southeastasia" --output none
     
     # Run validation with dummy parameters
     $validateResult = az deployment group validate `
@@ -123,7 +123,7 @@ function Test-WhatIfDeployment {
     # Create temp resource group for what-if
     $tempRg = "rg-firewall-dnat-whatif-temp"
     Write-ColorOutput "📦 Creating temporary what-if resource group..." "Yellow"
-    az group create --name $tempRg --location "eastus" --output none
+    az group create --name $tempRg --location "southeastasia" --output none
     
     # Run what-if analysis
     $whatifResult = az deployment group what-if `

@@ -71,7 +71,7 @@ This Bicep template creates a comprehensive lab environment demonstrating Privat
 ### Azure CLI
 ```bash
 # Create resource group
-az group create --name rg-pe-policies --location eastus
+az group create --name rg-pe-policies --location southeastasia
 
 # Deploy template
 az deployment group create \

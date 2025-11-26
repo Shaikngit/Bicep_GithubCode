@@ -75,7 +75,7 @@ This Bicep template deploys a Linux virtual machine with Application Security Gr
 ### Azure CLI
 ```bash
 # Create resource group
-az group create --name rg-linux-asg --location eastus
+az group create --name rg-linux-asg --location southeastasia
 
 # Generate SSH key pair (if needed)
 ssh-keygen -t rsa -b 2048 -f ~/.ssh/azure_vm_key

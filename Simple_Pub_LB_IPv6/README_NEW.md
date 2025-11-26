@@ -81,7 +81,7 @@ This Bicep template deploys a Standard Public Load Balancer with dual-stack IPv4
 ### Azure CLI
 ```bash
 # Create resource group
-az group create --name rg-lb-ipv6 --location eastus
+az group create --name rg-lb-ipv6 --location southeastasia
 
 # Deploy template
 az deployment group create \

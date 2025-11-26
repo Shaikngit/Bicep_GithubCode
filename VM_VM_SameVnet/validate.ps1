@@ -55,7 +55,7 @@ function Test-TemplateValidation {
     
     # Create temp RG
     $tempRg = "rg-vm-samevnet-validate-temp"
-    az group create --name $tempRg --location "eastus" --output none
+    az group create --name $tempRg --location "southeastasia" --output none
     
     $validateResult = az deployment group validate --resource-group $tempRg --template-file $TemplateFile --parameters adminUsername=validateuser adminPassword=ValidatePass123! allowedRdpSourceAddress=0.0.0.0/0 vmSizeOption=Non-Overlake osType=Windows 2>&1
     

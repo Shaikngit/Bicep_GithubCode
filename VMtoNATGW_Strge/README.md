@@ -67,7 +67,7 @@ This Bicep template deploys a client virtual machine with NAT Gateway for outbou
 ### Azure CLI
 ```bash
 # Create resource group
-az group create --name rg-vm-natgw-storage --location eastus
+az group create --name rg-vm-natgw-storage --location southeastasia
 
 # Deploy template
 az deployment group create \

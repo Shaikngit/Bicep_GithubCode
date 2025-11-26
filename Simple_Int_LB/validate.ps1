@@ -18,7 +18,7 @@
     Name of the resource group for validation context (default: rg-simple-int-lb-validate)
 
 .PARAMETER Location
-    Azure region for validation (default: eastus)
+    Azure region for validation (default: southeastasia)
 
 .PARAMETER SubscriptionId
     Azure subscription ID (optional - uses current subscription if not specified)

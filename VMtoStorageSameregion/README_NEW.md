@@ -74,7 +74,7 @@ This Bicep template deploys a Windows virtual machine with a Storage Account in 
 ### Azure CLI
 ```bash
 # Create resource group
-az group create --name rg-vm-storage-region --location eastus
+az group create --name rg-vm-storage-region --location southeastasia
 
 # Deploy template
 az deployment group create \

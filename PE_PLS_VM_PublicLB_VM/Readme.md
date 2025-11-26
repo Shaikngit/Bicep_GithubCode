@@ -91,7 +91,7 @@ This Bicep template demonstrates Azure Private Link Service (PLS) connected to a
 ### Azure CLI
 ```bash
 # Create resource group
-az group create --name rg-pls-public --location eastus
+az group create --name rg-pls-public --location southeastasia
 
 # Deploy template
 az deployment group create \

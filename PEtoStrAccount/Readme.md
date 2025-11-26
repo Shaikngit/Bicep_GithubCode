@@ -85,7 +85,7 @@ This Bicep template demonstrates how to create a Linux Virtual Machine in a virt
 ### Azure CLI
 ```bash
 # Create resource group
-az group create --name rg-storage-pe --location eastus
+az group create --name rg-storage-pe --location southeastasia
 
 # Deploy template with SSH key
 az deployment group create \

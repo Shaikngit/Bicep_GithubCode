@@ -74,7 +74,7 @@ This Bicep template deploys a Standard Internal Load Balancer with backend virtu
 ### Azure CLI
 ```bash
 # Create resource group
-az group create --name rg-simple-intlb --location eastus
+az group create --name rg-simple-intlb --location southeastasia
 
 # Deploy template
 az deployment group create \

@@ -19,7 +19,7 @@ function Test-BicepSyntax {
 
 function Test-TemplateValidation {
     Write-ColorOutput "🔍 Running ARM template validation..." "Cyan"
-    $tempRg = "rg-pe-pls-validate-temp"; az group create --name $tempRg --location "eastus" --output none
+    $tempRg = "rg-pe-pls-validate-temp"; az group create --name $tempRg --location "southeastasia" --output none
     $validateResult = az deployment group validate --resource-group $tempRg --template-file $TemplateFile --parameters vmAdminUsername=validateuser vmAdminPassword=ValidatePass123! vmSizeOption=Non-Overlake allowedRdpSourceAddress=0.0.0.0/0 useCustomImage=No 2>&1
     az group delete --name $tempRg --yes --no-wait --output none
     if ($LASTEXITCODE -eq 0) { Write-ColorOutput "✅ ARM template validation passed" "Green"; if ($Detailed) { Write-ColorOutput $validateResult "White" }; return $true }
