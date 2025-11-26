@@ -12,7 +12,7 @@
     Name of the resource group to deploy to (default: rg-pe-storage-account)
 
 .PARAMETER Location
-    Azure region for deployment (default: eastus)
+    Azure region for deployment (default: southeastasia)
 
 .PARAMETER AdminPasswordOrKey
     Administrator password or SSH public key for VM
@@ -44,7 +44,7 @@ param(
     [string]$ResourceGroupName = "rg-pe-storage-account",
     
     [Parameter(Mandatory=$false)]
-    [string]$Location = "eastus",
+    [string]$Location = "southeastasia",
     
     [Parameter(Mandatory=$true)]
     [string]$AdminPasswordOrKey,

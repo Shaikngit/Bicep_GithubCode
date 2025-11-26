@@ -12,7 +12,7 @@
     Name of the resource group to deploy to (default: rg-pe-pls-vm-publb)
 
 .PARAMETER Location
-    Azure region for deployment (default: eastus)
+    Azure region for deployment (default: southeastasia)
 
 .PARAMETER VmAdminUsername
     Administrator username for the VMs
@@ -47,7 +47,7 @@ param(
     [string]$ResourceGroupName = "rg-pe-pls-vm-publb",
     
     [Parameter(Mandatory=$false)]
-    [string]$Location = "eastus",
+    [string]$Location = "southeastasia",
     
     [Parameter(Mandatory=$true)]
     [string]$VmAdminUsername,

@@ -12,7 +12,7 @@
     Name of the resource group to deploy to (default: rg-pe-policies-lab)
 
 .PARAMETER Location
-    Azure region for deployment (default: eastus)
+    Azure region for deployment (default: southeastasia)
 
 .PARAMETER AdminPassword
     Administrator password for the VMs and SQL server
@@ -44,7 +44,7 @@ param(
     [string]$ResourceGroupName = "rg-pe-policies-lab",
     
     [Parameter(Mandatory=$false)]
-    [string]$Location = "eastus",
+    [string]$Location = "southeastasia",
     
     [Parameter(Mandatory=$true)]
     [string]$AdminPassword,

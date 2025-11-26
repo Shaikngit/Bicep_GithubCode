@@ -47,7 +47,7 @@ param(
     [string]$ResourceGroupName = "rg-pe-sqlserverdb-validate",
     
     [Parameter(Mandatory=$false)]
-    [string]$Location = "eastus",
+    [string]$Location = "southeastasia",
     
     [Parameter(Mandatory=$false)]
     [string]$SubscriptionId,

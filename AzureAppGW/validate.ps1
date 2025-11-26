@@ -47,7 +47,7 @@ param(
     [string]$ResourceGroupName = "rg-azure-appgw-validate",
     
     [Parameter(Mandatory=$false)]
-    [string]$Location = "eastus",
+    [string]$Location = "southeastasia",
     
     [Parameter(Mandatory=$false)]
     [string]$SubscriptionId,

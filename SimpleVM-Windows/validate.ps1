@@ -47,7 +47,7 @@ param(
     [string]$ResourceGroupName = "rg-simple-windows-vm-validate",
     
     [Parameter(Mandatory=$false)]
-    [string]$Location = "eastus",
+    [string]$Location = "southeastasia",
     
     [Parameter(Mandatory=$false)]
     [string]$SubscriptionId,

@@ -12,7 +12,7 @@
     Name of the resource group to deploy to (default: rg-pe-sqlserverdb)
 
 .PARAMETER Location
-    Azure region for deployment (default: eastus)
+    Azure region for deployment (default: southeastasia)
 
 .PARAMETER SqlAdministratorLogin
     Administrator username for SQL Server
@@ -50,7 +50,7 @@ param(
     [string]$ResourceGroupName = "rg-pe-sqlserverdb",
     
     [Parameter(Mandatory=$false)]
-    [string]$Location = "eastus",
+    [string]$Location = "southeastasia",
     
     [Parameter(Mandatory=$true)]
     [string]$SqlAdministratorLogin,
