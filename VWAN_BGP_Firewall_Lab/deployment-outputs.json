@@ -1,0 +1,114 @@
+{
+  "azureFirewallId": {
+    "type": "String",
+    "value": "/subscriptions/8f8bee69-0b24-457d-a9af-3623095b0d78/resourceGroups/rg-vwan-bg-lab-new-it1/providers/Microsoft.Network/azureFirewalls/vwan-bgp-hub-fw"
+  },
+  "azureFirewallName": {
+    "type": "String",
+    "value": "vwan-bgp-hub-fw"
+  },
+  "azureFirewallPrivateIp": {
+    "type": "String",
+    "value": "10.10.0.132"
+  },
+  "bastionOnPremName": {
+    "type": "String",
+    "value": "vwan-bgp-bastion-onprem"
+  },
+  "bastionSpoke1Name": {
+    "type": "String",
+    "value": "vwan-bgp-bastion-spoke1"
+  },
+  "hubVpnGatewayId": {
+    "type": "String",
+    "value": "/subscriptions/8f8bee69-0b24-457d-a9af-3623095b0d78/resourceGroups/rg-vwan-bg-lab-new-it1/providers/Microsoft.Network/vpnGateways/vwan-bgp-hub-vpngw"
+  },
+  "hubVpnGatewayName": {
+    "type": "String",
+    "value": "vwan-bgp-hub-vpngw"
+  },
+  "onPremVpnGatewayId": {
+    "type": "String",
+    "value": "/subscriptions/8f8bee69-0b24-457d-a9af-3623095b0d78/resourceGroups/rg-vwan-bg-lab-new-it1/providers/Microsoft.Network/virtualNetworkGateways/vwan-bgp-onprem-vpngw"
+  },
+  "onPremVpnGatewayName": {
+    "type": "String",
+    "value": "vwan-bgp-onprem-vpngw"
+  },
+  "onPremVpnGatewayPublicIp": {
+    "type": "String",
+    "value": "20.24.214.24"
+  },
+  "virtualHubAddressPrefix": {
+    "type": "String",
+    "value": "10.10.0.0/24"
+  },
+  "virtualHubId": {
+    "type": "String",
+    "value": "/subscriptions/8f8bee69-0b24-457d-a9af-3623095b0d78/resourceGroups/rg-vwan-bg-lab-new-it1/providers/Microsoft.Network/virtualHubs/vwan-bgp-hub-sea"
+  },
+  "virtualHubName": {
+    "type": "String",
+    "value": "vwan-bgp-hub-sea"
+  },
+  "virtualWanId": {
+    "type": "String",
+    "value": "/subscriptions/8f8bee69-0b24-457d-a9af-3623095b0d78/resourceGroups/rg-vwan-bg-lab-new-it1/providers/Microsoft.Network/virtualWans/vwan-bgp-vwan"
+  },
+  "virtualWanName": {
+    "type": "String",
+    "value": "vwan-bgp-vwan"
+  },
+  "vmOnPremPrivateIp": {
+    "type": "String",
+    "value": "192.168.2.4"
+  },
+  "vmSpoke1PrivateIp": {
+    "type": "String",
+    "value": "10.20.1.4"
+  },
+  "vmSpoke2PrivateIp": {
+    "type": "String",
+    "value": "10.30.1.4"
+  },
+  "vnetOnPremId": {
+    "type": "String",
+    "value": "/subscriptions/8f8bee69-0b24-457d-a9af-3623095b0d78/resourceGroups/rg-vwan-bg-lab-new-it1/providers/Microsoft.Network/virtualNetworks/vwan-bgp-vnet-onprem"
+  },
+  "vnetOnPremName": {
+    "type": "String",
+    "value": "vwan-bgp-vnet-onprem"
+  },
+  "vnetSpoke1Id": {
+    "type": "String",
+    "value": "/subscriptions/8f8bee69-0b24-457d-a9af-3623095b0d78/resourceGroups/rg-vwan-bg-lab-new-it1/providers/Microsoft.Network/virtualNetworks/vwan-bgp-vnet-spoke1"
+  },
+  "vnetSpoke1Name": {
+    "type": "String",
+    "value": "vwan-bgp-vnet-spoke1"
+  },
+  "vnetSpoke2Id": {
+    "type": "String",
+    "value": "/subscriptions/8f8bee69-0b24-457d-a9af-3623095b0d78/resourceGroups/rg-vwan-bg-lab-new-it1/providers/Microsoft.Network/virtualNetworks/vwan-bgp-vnet-spoke2"
+  },
+  "vnetSpoke2Name": {
+    "type": "String",
+    "value": "vwan-bgp-vnet-spoke2"
+  },
+  "vpnConnectionId": {
+    "type": "String",
+    "value": "/subscriptions/8f8bee69-0b24-457d-a9af-3623095b0d78/resourceGroups/rg-vwan-bg-lab-new-it1/providers/Microsoft.Network/vpnGateways/vwan-bgp-hub-vpngw/vpnConnections/conn-to-onprem"
+  },
+  "vpnConnectionName": {
+    "type": "String",
+    "value": "conn-to-onprem"
+  },
+  "vpnSiteId": {
+    "type": "String",
+    "value": "/subscriptions/8f8bee69-0b24-457d-a9af-3623095b0d78/resourceGroups/rg-vwan-bg-lab-new-it1/providers/Microsoft.Network/vpnSites/vwan-bgp-vpnsite-onprem"
+  },
+  "vpnSiteName": {
+    "type": "String",
+    "value": "vwan-bgp-vpnsite-onprem"
+  }
+}

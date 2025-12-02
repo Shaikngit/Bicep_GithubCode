@@ -146,6 +146,7 @@ function Start-Deployment {
         "--resource-group", $ResourceGroupName
         "--template-file", "main.bicep"
         "--name", $deploymentName
+        "--output", "none"
         "--parameters"
         "vmAdminUsername=$VmAdminUsername"
         "vmAdminPassword=$VmAdminPassword"
