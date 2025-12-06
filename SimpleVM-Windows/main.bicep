@@ -29,6 +29,9 @@ param useCustomImage string = 'No'
 //param customImageResourceId string = '/subscriptions/8f8bee69-0b24-457d-a9af-3623095b0d78/resourceGroups/shaiknlab2/providers/Microsoft.Compute/galleries/shaikngallery/images/newvmdef/versions/0.0.1'
 param customImageResourceId string = '/subscriptions/8f8bee69-0b24-457d-a9af-3623095b0d78/resourceGroups/shaiknlab2/providers/Microsoft.Compute/galleries/shaikngallery/images/newvmdef/versions/0.0.1'
 
+@description('Enable Azure Bastion for secure RDP access without public IP on VM.')
+param enableBastion bool = false
+
 var useCustomImageBool = useCustomImage == 'Yes' ? true : false 
 var vmSize = vmSizeOption == 'Overlake' ? 'Standard_D2s_v5' : 'Standard_D2s_v4'
 
@@ -41,14 +44,21 @@ resource vnet 'Microsoft.Network/virtualNetworks@2020-06-01' = {
         '10.0.0.0/16'
       ]
     }
-    subnets: [
+    subnets: concat([
       {
         name: 'default'
         properties: {
           addressPrefix: '10.0.0.0/24'
         }
       }
-    ]
+    ], enableBastion ? [
+      {
+        name: 'AzureBastionSubnet'
+        properties: {
+          addressPrefix: '10.0.1.0/26'
+        }
+      }
+    ] : [])
   }
 }
 resource nsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
@@ -78,6 +88,40 @@ resource publicIp 'Microsoft.Network/publicIPAddresses@2024-01-01' = {
   location: location
   properties: {
     publicIPAllocationMethod: 'Dynamic'
+  }
+}
+
+resource bastionPublicIp 'Microsoft.Network/publicIPAddresses@2024-01-01' = if (enableBastion) {
+  name: 'bastionPublicIp'
+  location: location
+  sku: {
+    name: 'Standard'
+  }
+  properties: {
+    publicIPAllocationMethod: 'Static'
+  }
+}
+
+resource bastionHost 'Microsoft.Network/bastionHosts@2023-11-01' = if (enableBastion) {
+  name: 'myBastionHost'
+  location: location
+  sku: {
+    name: 'Basic'
+  }
+  properties: {
+    ipConfigurations: [
+      {
+        name: 'bastionIpConfig'
+        properties: {
+          subnet: {
+            id: '${vnet.id}/subnets/AzureBastionSubnet'
+          }
+          publicIPAddress: {
+            id: bastionPublicIp.id
+          }
+        }
+      }
+    ]
   }
 }
 

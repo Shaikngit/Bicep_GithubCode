@@ -63,6 +63,13 @@ param(
     [string]$VmSizeOption = "Non-Overlake",
     
     [Parameter(Mandatory=$false)]
+    [switch]$EnableBastion,
+    
+    [Parameter(Mandatory=$false)]
+    [ValidateSet("Yes", "No")]
+    [string]$UseCustomImage = "No",
+    
+    [Parameter(Mandatory=$false)]
     [string]$SubscriptionId,
     
     [Parameter(Mandatory=$false)]
@@ -176,8 +183,11 @@ function Get-UserConfirmation {
     }
     
     Write-ColorOutput "⚠️  This deployment will create Azure resources and may incur costs." "Yellow"
-    Write-ColorOutput "⚠️  Windows VM (B2s): ~$30-40/month" "Yellow"
+    Write-ColorOutput "⚠️  Windows VM (D2s): ~$70-100/month" "Yellow"
     Write-ColorOutput "⚠️  Public IP: ~$4/month" "Yellow"
+    if ($EnableBastion) {
+        Write-ColorOutput "⚠️  Azure Bastion (Basic): ~$140/month" "Yellow"
+    }
     Write-ColorOutput "" "White"
     
     $response = Read-Host "Do you want to continue? (y/N)"
@@ -221,6 +231,8 @@ function Start-Deployment {
         "adminPassword=$AdminPassword"
         "allowedRdpSourceAddress=$AllowedRdpSourceAddress"
         "vmSizeOption=$VmSizeOption"
+        "enableBastion=$($EnableBastion.ToString().ToLower())"
+        "useCustomImage=$UseCustomImage"
     )
     
     if ($WhatIf) {
@@ -234,8 +246,8 @@ function Start-Deployment {
         Write-ColorOutput "🏗️  Deploying resources..." "Cyan"
     }
     
-    # Execute deployment
-    & $deployCmd[0] $deployCmd[1..($deployCmd.Length-1)]
+    # Execute deployment (suppress JSON output)
+    & $deployCmd[0] $deployCmd[1..($deployCmd.Length-1)] --output none
     
     if ($LASTEXITCODE -eq 0) {
         if ($WhatIf) {
@@ -244,9 +256,80 @@ function Start-Deployment {
             Write-ColorOutput "✅ Deployment completed successfully!" "Green"
             Write-ColorOutput "⏰ End time: $(Get-Date)" "White"
             
-            # Get deployment outputs
-            Write-ColorOutput "📊 Deployment outputs:" "Cyan"
-            az deployment group show --resource-group $ResourceGroupName --name $deploymentName --query "properties.outputs" --output table
+            # Get VM details
+            Write-ColorOutput "" "White"
+            Write-ColorOutput "=========================================" "Cyan"
+            Write-ColorOutput "🖥️  WINDOWS VM CONFIGURATION" "Cyan"
+            Write-ColorOutput "=========================================" "Cyan"
+            
+            $vmInfo = az vm show --resource-group $ResourceGroupName --name "myVm" --query "{Name:name, Size:hardwareProfile.vmSize, OS:storageProfile.osDisk.osType, Location:location}" -o json | ConvertFrom-Json
+            Write-ColorOutput "VM Name:        $($vmInfo.Name)" "White"
+            Write-ColorOutput "VM Size:        $($vmInfo.Size)" "White"
+            Write-ColorOutput "OS Type:        $($vmInfo.OS)" "White"
+            Write-ColorOutput "Location:       $($vmInfo.Location)" "White"
+            
+            $nicInfo = az vm nic show --resource-group $ResourceGroupName --vm-name "myVm" --nic "myNic" --query "ipConfigurations[0].privateIPAddress" -o tsv
+            Write-ColorOutput "Private IP:     $nicInfo" "White"
+            
+            # Get Public IP if available
+            $publicIpAddress = az network public-ip show --resource-group $ResourceGroupName --name "myPublicIp" --query "ipAddress" -o tsv 2>$null
+            if ($publicIpAddress -and $publicIpAddress -ne "null") {
+                Write-ColorOutput "Public IP:      $publicIpAddress" "White"
+            } else {
+                Write-ColorOutput "Public IP:      (Dynamic - connect to VM to see)" "Yellow"
+            }
+            
+            Write-ColorOutput "" "White"
+            Write-ColorOutput "=========================================" "Cyan"
+            Write-ColorOutput "🔐 HOW TO ACCESS THE VM" "Cyan"
+            Write-ColorOutput "=========================================" "Cyan"
+            
+            if ($EnableBastion) {
+                Write-ColorOutput "✅ Azure Bastion is enabled for secure access" "Green"
+                Write-ColorOutput "" "White"
+                Write-ColorOutput "To connect via Azure Bastion:" "White"
+                Write-ColorOutput "1. Go to Azure Portal: https://portal.azure.com" "White"
+                Write-ColorOutput "2. Navigate to: Resource Groups > $ResourceGroupName > myVm" "White"
+                Write-ColorOutput "3. Click 'Connect' > 'Bastion'" "White"
+                Write-ColorOutput "4. Enter credentials:" "White"
+                Write-ColorOutput "   Username: $AdminUsername" "White"
+                Write-ColorOutput "   Password: (your password)" "White"
+                Write-ColorOutput "5. Click 'Connect' to open RDP in browser" "White"
+            } else {
+                Write-ColorOutput "📡 Direct RDP access via Public IP" "Yellow"
+                Write-ColorOutput "" "White"
+                Write-ColorOutput "To connect via RDP:" "White"
+                if ($publicIpAddress -and $publicIpAddress -ne "null") {
+                    Write-ColorOutput "1. Open Remote Desktop Connection (mstsc.exe)" "White"
+                    Write-ColorOutput "2. Computer: $publicIpAddress" "White"
+                } else {
+                    Write-ColorOutput "1. Start the VM if stopped, then get Public IP from portal" "White"
+                    Write-ColorOutput "2. Open Remote Desktop Connection (mstsc.exe)" "White"
+                }
+                Write-ColorOutput "3. Enter credentials:" "White"
+                Write-ColorOutput "   Username: $AdminUsername" "White"
+                Write-ColorOutput "   Password: (your password)" "White"
+            }
+            
+            Write-ColorOutput "" "White"
+            Write-ColorOutput "=========================================" "Cyan"
+            Write-ColorOutput "🧪 BASIC CONNECTIVITY TESTS" "Cyan"
+            Write-ColorOutput "=========================================" "Cyan"
+            Write-ColorOutput "Once connected to the VM, run these tests:" "White"
+            Write-ColorOutput "" "White"
+            Write-ColorOutput "1. Test Internet connectivity:" "Yellow"
+            Write-ColorOutput "   ping 8.8.8.8" "White"
+            Write-ColorOutput "   Test-NetConnection -ComputerName google.com -Port 443" "White"
+            Write-ColorOutput "" "White"
+            Write-ColorOutput "2. Test DNS resolution:" "Yellow"
+            Write-ColorOutput "   nslookup google.com" "White"
+            Write-ColorOutput "" "White"
+            Write-ColorOutput "3. Check network configuration:" "Yellow"
+            Write-ColorOutput "   ipconfig /all" "White"
+            Write-ColorOutput "" "White"
+            Write-ColorOutput "4. Test web browsing:" "Yellow"
+            Write-ColorOutput "   Invoke-WebRequest -Uri https://www.microsoft.com -UseBasicParsing" "White"
+            Write-ColorOutput "=========================================" "Cyan"
         }
     } else {
         Write-ColorOutput "❌ Deployment failed: Deployment failed with exit code: $LASTEXITCODE" "Red"
@@ -283,6 +366,11 @@ Write-ColorOutput "• Resource Group: $ResourceGroupName" "White"
 Write-ColorOutput "• Location: $Location" "White"
 Write-ColorOutput "• VM Size Option: $VmSizeOption" "White"
 Write-ColorOutput "• Allowed RDP Source: $AllowedRdpSourceAddress" "White"
+if ($EnableBastion) {
+    Write-ColorOutput "• Azure Bastion: Enabled (secure RDP access)" "Green"
+} else {
+    Write-ColorOutput "• Azure Bastion: Disabled (using public IP for RDP)" "Yellow"
+}
 if ($WhatIf) {
     Write-ColorOutput "• Deployment Type: What-If Analysis" "Yellow"
 } else {
