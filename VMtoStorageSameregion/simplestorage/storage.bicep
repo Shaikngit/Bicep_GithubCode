@@ -28,3 +28,8 @@ resource container 'Microsoft.Storage/storageAccounts/blobServices/containers@20
   parent: blobServices
   name: containerName
 }
+
+output storageAccountName string = sa.name
+output storageAccountBlobEndpoint string = sa.properties.primaryEndpoints.blob
+output containerName string = container.name
+output storageAccountId string = sa.id

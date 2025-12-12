@@ -5,17 +5,12 @@ param adminUsername string
 @secure()
 param adminPassword string 
 
-@description('The allowed IP address for RDP access.')
-param allowedRdpSourceAddress string
-
 @description('Specifies whether to use Overlake VM size or not.')
 @allowed([
   'Overlake'
   'Non-Overlake'
 ])
 param vmSizeOption string
-
-
 
 @description('The location of the resource group.')
 param location string = resourceGroup().location
@@ -33,7 +28,7 @@ param customImageResourceId string = '/subscriptions/8f8bee69-0b24-457d-a9af-362
 var useCustomImageBool = useCustomImage == 'Yes' ? true : false 
 var vmSize = vmSizeOption == 'Overlake' ? 'Standard_D2s_v5' : 'Standard_D2s_v4'
 
-resource vnet 'Microsoft.Network/virtualNetworks@2020-06-01' = {
+resource vnet 'Microsoft.Network/virtualNetworks@2023-11-01' = {
   name: 'clientVNET'
   location: location
   properties: {
@@ -47,42 +42,78 @@ resource vnet 'Microsoft.Network/virtualNetworks@2020-06-01' = {
         name: 'default'
         properties: {
           addressPrefix: '10.0.0.0/24'
+          networkSecurityGroup: {
+            id: nsg.id
+          }
+        }
+      }
+      {
+        name: 'AzureBastionSubnet'
+        properties: {
+          addressPrefix: '10.0.1.0/26'
         }
       }
     ]
   }
 }
-resource nsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
+
+resource nsg 'Microsoft.Network/networkSecurityGroups@2023-11-01' = {
   name: 'myNsg'
   location: location
   properties: {
-    securityRules: [
+    securityRules: []
+  }
+}
+
+// Bastion Public IP - Standard SKU required for Bastion
+resource bastionPublicIp 'Microsoft.Network/publicIPAddresses@2023-11-01' = {
+  name: 'bastion-pip'
+  location: location
+  sku: {
+    name: 'Standard'
+  }
+  properties: {
+    publicIPAllocationMethod: 'Static'
+  }
+}
+
+// VM Public IP - for internet access to install tools
+resource vmPublicIp 'Microsoft.Network/publicIPAddresses@2023-11-01' = {
+  name: 'vm-pip'
+  location: location
+  sku: {
+    name: 'Standard'
+  }
+  properties: {
+    publicIPAllocationMethod: 'Static'
+  }
+}
+
+// Azure Bastion for secure VM access
+resource bastion 'Microsoft.Network/bastionHosts@2023-11-01' = {
+  name: 'myBastion'
+  location: location
+  sku: {
+    name: 'Basic'
+  }
+  properties: {
+    ipConfigurations: [
       {
-        name: 'AllowRDP'
+        name: 'bastionIpConfig'
         properties: {
-          priority: 1000
-          direction: 'Inbound'
-          access: 'Allow'
-          protocol: 'Tcp'
-          sourcePortRange: '*'
-          destinationPortRange: '3389'
-          sourceAddressPrefix: allowedRdpSourceAddress
-          destinationAddressPrefix: '*'
+          subnet: {
+            id: vnet.properties.subnets[1].id
+          }
+          publicIPAddress: {
+            id: bastionPublicIp.id
+          }
         }
       }
     ]
   }
 }
 
-resource publicIp 'Microsoft.Network/publicIPAddresses@2024-01-01' = {
-  name: 'myPublicIp'
-  location: location
-  properties: {
-    publicIPAllocationMethod: 'Dynamic'
-  }
-}
-
-resource nic 'Microsoft.Network/networkInterfaces@2020-06-01' = {
+resource nic 'Microsoft.Network/networkInterfaces@2023-11-01' = {
   name: 'myNic'
   location: location
   properties: {
@@ -95,20 +126,20 @@ resource nic 'Microsoft.Network/networkInterfaces@2020-06-01' = {
           }
           privateIPAllocationMethod: 'Dynamic'
           publicIPAddress: {
-            id: publicIp.id
+            id: vmPublicIp.id
           }
         }
       }
     ]
-    networkSecurityGroup: {
-      id: nsg.id
-    }
   }
 }
 
-resource vm 'Microsoft.Compute/virtualMachines@2020-06-01' = {
+resource vm 'Microsoft.Compute/virtualMachines@2023-09-01' = {
   name: 'myVm'
   location: location
+  identity: {
+    type: 'SystemAssigned'
+  }
   properties: {
     hardwareProfile: {
       vmSize: vmSize
@@ -141,6 +172,8 @@ resource vm 'Microsoft.Compute/virtualMachines@2020-06-01' = {
   }
 }
 
-
-
-
+output bastionName string = bastion.name
+output vmName string = vm.name
+output vmPrivateIp string = nic.properties.ipConfigurations[0].properties.privateIPAddress
+output vmPublicIp string = vmPublicIp.properties.ipAddress
+output vmPrincipalId string = vm.identity.principalId

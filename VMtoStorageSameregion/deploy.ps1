@@ -2,11 +2,12 @@
 
 <#
 .SYNOPSIS
-    Deploys VM and Storage Account in same region using modular architecture
+    Deploys VM and Storage Account in same region using modular architecture with Azure Bastion
 
 .DESCRIPTION
     This script deploys a Windows VM and Storage Account in the same Azure region
     using modular Bicep templates for optimal performance and data locality.
+    The VM is secured with Azure Bastion - no public IP or RDP exposure.
 
 .PARAMETER ResourceGroupName
     Name of the resource group to deploy to (default: rg-vm-storage-sameregion)
@@ -19,9 +20,6 @@
 
 .PARAMETER AdminUsername
     Administrator username for the VM
-
-.PARAMETER AllowedRdpSourceAddress
-    Source IP address or CIDR range allowed for RDP access
 
 .PARAMETER VmSizeOption
     VM size option - Overlake or Non-Overlake
@@ -36,7 +34,8 @@
     Preview deployment without making changes
 
 .EXAMPLE
-    .\deploy.ps1 -AdminPassword "YourStrongPassword123!" -AdminUsername "azureuser" -AllowedRdpSourceAddress "203.0.113.0/24" -VmSizeOption "Non-Overlake"
+    $securePassword = ConvertTo-SecureString "YourStrongPassword123!" -AsPlainText -Force
+    .\deploy.ps1 -AdminPassword $securePassword -AdminUsername "azureuser" -VmSizeOption "Non-Overlake"
 #>
 
 param(
@@ -47,13 +46,10 @@ param(
     [string]$Location = "southeastasia",
     
     [Parameter(Mandatory=$true)]
-    [string]$AdminPassword,
+    [SecureString]$AdminPassword,
     
     [Parameter(Mandatory=$true)]
     [string]$AdminUsername,
-    
-    [Parameter(Mandatory=$true)]
-    [string]$AllowedRdpSourceAddress,
     
     [Parameter(Mandatory=$true)]
     [ValidateSet("Overlake", "Non-Overlake")]
@@ -104,8 +100,9 @@ function Test-Prerequisites {
         }
     }
     
-    # Password validation
-    if ($AdminPassword.Length -ge 12 -and $AdminPassword -cmatch '[A-Z]' -and $AdminPassword -cmatch '[a-z]' -and $AdminPassword -match '\d' -and $AdminPassword -match '[^A-Za-z0-9]') {
+    # Password validation - convert SecureString to plain text for validation
+    $plainPassword = [System.Net.NetworkCredential]::new('', $AdminPassword).Password
+    if ($plainPassword.Length -ge 12 -and $plainPassword -cmatch '[A-Z]' -and $plainPassword -cmatch '[a-z]' -and $plainPassword -match '\d' -and $plainPassword -match '[^A-Za-z0-9]') {
         Write-ColorOutput "✅ Password meets complexity requirements" "Green"
     } else {
         Write-ColorOutput "❌ Password must be 12+ characters with uppercase, lowercase, digit, and special character" "Red"
@@ -115,13 +112,6 @@ function Test-Prerequisites {
     return $allGood
 }
 
-function Get-PublicIP {
-    try {
-        $ip = (Invoke-WebRequest -Uri "https://api.ipify.org" -UseBasicParsing).Content.Trim()
-        return "$ip/32"
-    } catch { return $AllowedRdpSourceAddress }
-}
-
 function Get-UserConfirmation {
     if ($Force) { return $true }
     
@@ -129,9 +119,10 @@ function Get-UserConfirmation {
     Write-ColorOutput "⚠️  VM (B2s): ~$35/month" "Yellow"
     Write-ColorOutput "⚠️  Storage Account: ~$20/month" "Yellow"
     Write-ColorOutput "⚠️  Virtual Network: ~$5/month" "Yellow"
-    Write-ColorOutput "⚠️  Public IP: ~$4/month" "Yellow"
-    Write-ColorOutput "⚠️  Total estimated cost: ~$65/month" "Yellow"
+    Write-ColorOutput "⚠️  Azure Bastion (Basic): ~$140/month" "Yellow"
+    Write-ColorOutput "⚠️  Total estimated cost: ~$200/month" "Yellow"
     Write-ColorOutput "✅ Same-region deployment for optimal performance!" "Green"
+    Write-ColorOutput "✅ Secure access via Azure Bastion (no public RDP exposure)!" "Green"
     
     $response = Read-Host "Do you want to continue with this same-region modular deployment? (y/N)"
     return ($response -eq 'y' -or $response -eq 'Y')
@@ -142,16 +133,13 @@ function Start-Deployment {
     
     if ($SubscriptionId) { az account set --subscription $SubscriptionId }
     
-    if ($AllowedRdpSourceAddress -eq "*") {
-        $publicIP = Get-PublicIP
-        $AllowedRdpSourceAddress = $publicIP
-        Write-ColorOutput "🌐 Auto-detected public IP: $AllowedRdpSourceAddress" "Cyan"
-    }
-    
     Write-ColorOutput "📦 Creating resource group: $ResourceGroupName" "Cyan"
     az group create --name $ResourceGroupName --location $Location --output none
     
     if ($LASTEXITCODE -ne 0) { Write-ColorOutput "❌ Failed to create resource group" "Red"; exit 1 }
+    
+    # Convert SecureString to plain text for Azure CLI
+    $plainPassword = [System.Net.NetworkCredential]::new('', $AdminPassword).Password
     
     $deployCmd = @(
         "az", "deployment", "group", "create"
@@ -159,9 +147,8 @@ function Start-Deployment {
         "--template-file", "main.bicep"
         "--name", $deploymentName
         "--parameters"
-        "adminpassword=$AdminPassword"
+        "adminpassword=$plainPassword"
         "adminusername=$AdminUsername"
-        "allowedRdpSourceAddress=$AllowedRdpSourceAddress"
         "vmSizeOption=$VmSizeOption"
         "useCustomImage=$UseCustomImage"
     )
@@ -183,16 +170,117 @@ function Start-Deployment {
     if ($LASTEXITCODE -eq 0) {
         Write-ColorOutput "✅ Same-region modular deployment completed successfully!" "Green"
         if (-not $WhatIf) {
-            Write-ColorOutput "📊 Deployment outputs:" "Cyan"
-            az deployment group show --resource-group $ResourceGroupName --name $deploymentName --query "properties.outputs" --output table 2>/dev/null
+            # Get deployment outputs
+            $outputs = az deployment group show --resource-group $ResourceGroupName --name $deploymentName --query "properties.outputs" --output json 2>$null | ConvertFrom-Json
+            
+            $vmName = $outputs.vmName.value
+            $bastionName = $outputs.bastionName.value
+            $vmPrivateIp = $outputs.vmPrivateIp.value
+            $vmPublicIp = $outputs.vmPublicIp.value
+            $vmPrincipalId = $outputs.vmPrincipalId.value
+            $storageAccountName = $outputs.storageAccountName.value
+            $storageBlobEndpoint = $outputs.storageBlobEndpoint.value
+            $containerName = $outputs.containerName.value
             
             Write-ColorOutput "" "White"
-            Write-ColorOutput "📍 VM and Storage deployed in same region with:" "Green"
-            Write-ColorOutput "   • Windows VM for compute workloads" "White"
-            Write-ColorOutput "   • Storage Account for data persistence" "White"
-            Write-ColorOutput "   • Same-region deployment for low latency" "White"
-            Write-ColorOutput "   • VNet with secure configuration" "White"
-            Write-ColorOutput "   • Optimal data transfer performance" "White"
+            Write-ColorOutput "╔══════════════════════════════════════════════════════════════════╗" "Green"
+            Write-ColorOutput "║           🎉 DEPLOYMENT SUCCESSFUL - QUICK START GUIDE           ║" "Green"
+            Write-ColorOutput "╚══════════════════════════════════════════════════════════════════╝" "Green"
+            
+            Write-ColorOutput "" "White"
+            Write-ColorOutput "📋 DEPLOYED RESOURCES:" "Cyan"
+            Write-ColorOutput "   VM Name:              $vmName" "White"
+            Write-ColorOutput "   VM Private IP:        $vmPrivateIp" "White"
+            Write-ColorOutput "   VM Public IP:         $vmPublicIp" "White"
+            Write-ColorOutput "   VM Managed Identity:  $vmPrincipalId" "White"
+            Write-ColorOutput "   Bastion:              $bastionName" "White"
+            Write-ColorOutput "   Storage Account:      $storageAccountName" "White"
+            Write-ColorOutput "   Blob Endpoint:        $storageBlobEndpoint" "White"
+            Write-ColorOutput "   Container:            $containerName" "White"
+            Write-ColorOutput "   RBAC Role:            Storage Blob Data Contributor (assigned to VM)" "White"
+            
+            Write-ColorOutput "" "White"
+            Write-ColorOutput "═══════════════════════════════════════════════════════════════════" "Cyan"
+            Write-ColorOutput "🔐 HOW TO CONNECT TO YOUR VM VIA BASTION:" "Cyan"
+            Write-ColorOutput "═══════════════════════════════════════════════════════════════════" "Cyan"
+            Write-ColorOutput "" "White"
+            Write-ColorOutput "   OPTION 1: Azure Portal (Recommended)" "Yellow"
+            Write-ColorOutput "   ─────────────────────────────────────" "White"
+            Write-ColorOutput "   1. Go to: https://portal.azure.com" "White"
+            Write-ColorOutput "   2. Navigate to: Virtual Machines > $vmName" "White"
+            Write-ColorOutput "   3. Click 'Connect' > 'Connect via Bastion'" "White"
+            Write-ColorOutput "   4. Enter Username: $AdminUsername" "White"
+            Write-ColorOutput "   5. Enter your password and click 'Connect'" "White"
+            Write-ColorOutput "" "White"
+            Write-ColorOutput "   OPTION 2: Azure CLI" "Yellow"
+            Write-ColorOutput "   ────────────────────" "White"
+            Write-ColorOutput "   az network bastion rdp --name $bastionName --resource-group $ResourceGroupName --target-resource-id /subscriptions/`$(az account show --query id -o tsv)/resourceGroups/$ResourceGroupName/providers/Microsoft.Compute/virtualMachines/$vmName" "White"
+            
+            Write-ColorOutput "" "White"
+            Write-ColorOutput "═══════════════════════════════════════════════════════════════════" "Cyan"
+            Write-ColorOutput "🔗 HOW TO TEST STORAGE CONNECTIVITY FROM VM:" "Cyan"
+            Write-ColorOutput "═══════════════════════════════════════════════════════════════════" "Cyan"
+            Write-ColorOutput "" "White"
+            Write-ColorOutput "   Once connected to VM via Bastion, run these commands:" "Yellow"
+            Write-ColorOutput "" "White"
+            Write-ColorOutput "   TEST 1: Verify DNS Resolution" "Yellow"
+            Write-ColorOutput "   ──────────────────────────────" "White"
+            Write-ColorOutput "   nslookup $storageAccountName.blob.core.windows.net" "White"
+            Write-ColorOutput "" "White"
+            Write-ColorOutput "   TEST 2: Test Network Connectivity (Port 443)" "Yellow"
+            Write-ColorOutput "   ─────────────────────────────────────────────" "White"
+            Write-ColorOutput "   Test-NetConnection -ComputerName $storageAccountName.blob.core.windows.net -Port 443" "White"
+            Write-ColorOutput "" "White"
+            Write-ColorOutput "   TEST 3: List Blob Containers (requires Az module)" "Yellow"
+            Write-ColorOutput "   ─────────────────────────────────────────────────" "White"
+            Write-ColorOutput "   # Install Az module if not present" "White"
+            Write-ColorOutput "   Install-Module -Name Az -Scope CurrentUser -Force" "White"
+            Write-ColorOutput "   Connect-AzAccount" "White"
+            Write-ColorOutput "   Get-AzStorageContainer -Context (New-AzStorageContext -StorageAccountName $storageAccountName -UseConnectedAccount)" "White"
+            Write-ColorOutput "" "White"
+            Write-ColorOutput "   TEST 4: Quick HTTP Test" "Yellow"
+            Write-ColorOutput "   ────────────────────────" "White"
+            Write-ColorOutput "   Invoke-WebRequest -Uri '${storageBlobEndpoint}${containerName}?restype=container' -Method Head" "White"
+            
+            Write-ColorOutput "" "White"
+            Write-ColorOutput "═══════════════════════════════════════════════════════════════════" "Cyan"
+            Write-ColorOutput "🔑 ACCESS STORAGE WITH MANAGED IDENTITY (RECOMMENDED):" "Cyan"
+            Write-ColorOutput "═══════════════════════════════════════════════════════════════════" "Cyan"
+            Write-ColorOutput "" "White"
+            Write-ColorOutput "   The VM has a System-Assigned Managed Identity with" "Yellow"
+            Write-ColorOutput "   'Storage Blob Data Contributor' role on the storage account." "Yellow"
+            Write-ColorOutput "" "White"
+            Write-ColorOutput "   STEP 1: Install Azure CLI (one-time, requires internet)" "Yellow"
+            Write-ColorOutput "   ─────────────────────────────────────────────────────────" "White"
+            Write-ColorOutput "   Invoke-WebRequest -Uri https://aka.ms/installazurecliwindows -OutFile .\AzureCLI.msi" "White"
+            Write-ColorOutput "   Start-Process msiexec.exe -ArgumentList '/I AzureCLI.msi /quiet' -Wait" "White"
+            Write-ColorOutput "   # Restart PowerShell after installation" "White"
+            Write-ColorOutput "" "White"
+            Write-ColorOutput "   STEP 2: Login with Managed Identity" "Yellow"
+            Write-ColorOutput "   ────────────────────────────────────" "White"
+            Write-ColorOutput "   az login --identity --allow-no-subscriptions" "White"
+            Write-ColorOutput "" "White"
+            Write-ColorOutput "   STEP 3: Upload a Single File" "Yellow"
+            Write-ColorOutput "   ─────────────────────────────" "White"
+            Write-ColorOutput "   `"Hello from Azure!`" | Out-File test.txt" "White"
+            Write-ColorOutput "   az storage blob upload --account-name $storageAccountName --container-name $containerName --name test.txt --file `"test.txt`" --auth-mode login" "White"
+            Write-ColorOutput "" "White"
+            Write-ColorOutput "   STEP 4: Upload Multiple Files (Batch)" "Yellow"
+            Write-ColorOutput "   ──────────────────────────────────────" "White"
+            Write-ColorOutput "   az storage blob upload-batch --source `"C:\MyFolder`" --destination `"$containerName`" --account-name $storageAccountName --auth-mode login" "White"
+            Write-ColorOutput "" "White"
+            Write-ColorOutput "   STEP 5: List Blobs in Container" "Yellow"
+            Write-ColorOutput "   ────────────────────────────────" "White"
+            Write-ColorOutput "   az storage blob list --account-name $storageAccountName --container-name $containerName --auth-mode login --output table" "White"
+            Write-ColorOutput "" "White"
+            Write-ColorOutput "   💡 TIP: The --auth-mode login flag uses Managed Identity instead of keys!" "Green"
+            
+            Write-ColorOutput "" "White"
+            Write-ColorOutput "═══════════════════════════════════════════════════════════════════" "Cyan"
+            Write-ColorOutput "🧹 CLEANUP COMMAND:" "Cyan"
+            Write-ColorOutput "═══════════════════════════════════════════════════════════════════" "Cyan"
+            Write-ColorOutput "   az group delete --name $ResourceGroupName --yes --no-wait" "White"
+            Write-ColorOutput "" "White"
         }
     } else { Write-ColorOutput "❌ Same-region modular deployment failed" "Red"; exit 1 }
 }
@@ -209,8 +297,10 @@ Write-ColorOutput "=========================================" "Cyan"
 Write-ColorOutput "This modular deployment creates:" "White"
 Write-ColorOutput "• Windows VM module (simplewindows/client.bicep)" "White"
 Write-ColorOutput "• Storage Account module (simplestorage/storage.bicep)" "White"
+Write-ColorOutput "• Azure Bastion for secure VM access" "White"
 Write-ColorOutput "• Co-located in same Azure region" "White"
 Write-ColorOutput "• VNet with subnet configuration" "White"
+Write-ColorOutput "• No public RDP exposure (secure by design)" "White"
 Write-ColorOutput "• Optimized for data transfer performance" "White"
 Write-ColorOutput "" "White"
 Write-ColorOutput "Deployment Details:" "White"
@@ -218,7 +308,7 @@ Write-ColorOutput "• Resource Group: $ResourceGroupName" "White"
 Write-ColorOutput "• Location: $Location" "White"
 Write-ColorOutput "• VM Size Option: $VmSizeOption" "White"
 Write-ColorOutput "• Custom Image: $UseCustomImage" "White"
-Write-ColorOutput "• Allowed RDP Source: $AllowedRdpSourceAddress" "White"
+Write-ColorOutput "• VM Access: Azure Bastion (secure)" "White"
 Write-ColorOutput "• Deployment Type: Modular (main + 2 modules)" "White"
 Write-ColorOutput "• Optimization: Same-region co-location" "White"
 Write-ColorOutput "=========================================" "Cyan"
