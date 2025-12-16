@@ -2,10 +2,11 @@
 
 <#
 .SYNOPSIS
-    Deploys VMs in same VNet Bicep template
+    Deploys VMs in same VNet Bicep template with Azure Bastion
 
 .DESCRIPTION
-    This script deploys multiple VMs (Windows/Linux) in the same Virtual Network.
+    This script deploys multiple VMs (Windows/Linux) in the same Virtual Network
+    with Azure Bastion for secure remote access. No public IPs are exposed on VMs.
     Supports cross-platform deployment with proper authentication options.
 
 .PARAMETER ResourceGroupName
@@ -20,9 +21,6 @@
 .PARAMETER AdminPassword
     Administrator password for the VMs
 
-.PARAMETER AllowedRdpSourceAddress
-    Source IP address or CIDR range allowed for remote access
-
 .PARAMETER VmSizeOption
     VM size option - Overlake or Non-Overlake (default: Non-Overlake)
 
@@ -36,7 +34,7 @@
     Preview deployment without making changes
 
 .EXAMPLE
-    .\deploy.ps1 -AdminUsername "azureuser" -AdminPassword "YourStrongPassword123!" -AllowedRdpSourceAddress "203.0.113.0/24"
+    .\deploy.ps1 -AdminUsername "azureuser" -AdminPassword "YourStrongPassword123!"
 
 .EXAMPLE
     .\deploy.ps1 -AdminUsername "azureuser" -AdminPassword "YourStrongPassword123!" -OsType "Linux" -WhatIf
@@ -54,9 +52,6 @@ param(
     
     [Parameter(Mandatory=$true)]
     [string]$AdminPassword,
-    
-    [Parameter(Mandatory=$true)]
-    [string]$AllowedRdpSourceAddress,
     
     [Parameter(Mandatory=$false)]
     [ValidateSet("Overlake", "Non-Overlake")]
@@ -118,7 +113,8 @@ function Get-UserConfirmation {
     
     Write-ColorOutput "⚠️  This deployment will create multiple Azure resources and may incur costs." "Yellow"
     Write-ColorOutput "⚠️  Multiple VMs: ~$60-80/month" "Yellow"
-    Write-ColorOutput "⚠️  Virtual Network and IPs: ~$8/month" "Yellow"
+    Write-ColorOutput "⚠️  Azure Bastion (Basic): ~\$140/month" "Yellow"
+    Write-ColorOutput "⚠️  Virtual Network: ~\$5/month" "Yellow"
     
     $response = Read-Host "Do you want to continue? (y/N)"
     return ($response -eq 'y' -or $response -eq 'Y')
@@ -144,7 +140,6 @@ function Start-Deployment {
         "--parameters"
         "adminUsername=$AdminUsername"
         "adminPassword=$AdminPassword"
-        "allowedRdpSourceAddress=$AllowedRdpSourceAddress"
         "vmSizeOption=$VmSizeOption"
         "osType=$OsType"
     )

@@ -5,9 +5,6 @@ param adminUsername string
 @secure()
 param adminPassword string 
 
-@description('The allowed IP address for RDP access.')
-param allowedRdpSourceAddress string
-
 @description('The location of the resource group.')
 param location string = resourceGroup().location
 
@@ -67,6 +64,12 @@ resource vnet 'Microsoft.Network/virtualNetworks@2020-06-01' = {
           addressPrefix: '10.0.0.0/24'
         }
       }
+      {
+        name: 'AzureBastionSubnet'
+        properties: {
+          addressPrefix: '10.0.1.0/26'
+        }
+      }
     ]
   }
 }
@@ -74,41 +77,43 @@ resource nsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
   name: 'myNsg'
   location: location
   properties: {
-    securityRules: [
-      osType == 'Windows' ? {
-        name: 'AllowRDP'
-        properties: {
-          priority: 1000
-          direction: 'Inbound'
-          access: 'Allow'
-          protocol: 'Tcp'
-          sourcePortRange: '*'
-          destinationPortRange: '3389'
-          sourceAddressPrefix: allowedRdpSourceAddress
-          destinationAddressPrefix: '*'
-        }
-      } : {
-        name: 'AllowSSH'
-        properties: {
-          priority: 1000
-          direction: 'Inbound'
-          access: 'Allow'
-          protocol: 'Tcp'
-          sourcePortRange: '*'
-          destinationPortRange: '22'
-          sourceAddressPrefix: allowedRdpSourceAddress
-          destinationAddressPrefix: '*'
-        }
-      }
-    ]
+    securityRules: []
   }
 }
 
-resource publicIp 'Microsoft.Network/publicIPAddresses@2024-01-01' = {
-  name: 'myPublicIp'
+@description('Public IP address for Azure Bastion')
+resource bastionPublicIp 'Microsoft.Network/publicIPAddresses@2024-01-01' = {
+  name: 'bastionPublicIp'
   location: location
+  sku: {
+    name: 'Standard'
+  }
   properties: {
-    publicIPAllocationMethod: 'Dynamic'
+    publicIPAllocationMethod: 'Static'
+  }
+}
+
+@description('Azure Bastion Host for secure VM access')
+resource bastionHost 'Microsoft.Network/bastionHosts@2024-01-01' = {
+  name: 'bastionHost'
+  location: location
+  sku: {
+    name: 'Basic'
+  }
+  properties: {
+    ipConfigurations: [
+      {
+        name: 'bastionIpConfig'
+        properties: {
+          subnet: {
+            id: vnet.properties.subnets[1].id
+          }
+          publicIPAddress: {
+            id: bastionPublicIp.id
+          }
+        }
+      }
+    ]
   }
 }
 
@@ -124,9 +129,6 @@ resource nic 'Microsoft.Network/networkInterfaces@2020-06-01' = {
             id: vnet.properties.subnets[0].id
           }
           privateIPAllocationMethod: 'Dynamic'
-          publicIPAddress: {
-            id: publicIp.id
-          }
         }
       }
     ]
@@ -178,14 +180,6 @@ resource vm 'Microsoft.Compute/virtualMachines@2020-06-01' = {
   }
 }
 
-resource publicIp2 'Microsoft.Network/publicIPAddresses@2024-01-01' = {
-  name: 'myPublicIp2'
-  location: location
-  properties: {
-    publicIPAllocationMethod: 'Dynamic'
-  }
-}
-
 resource nic2 'Microsoft.Network/networkInterfaces@2020-06-01' = {
   name: 'myNic2'
   location: location
@@ -198,9 +192,6 @@ resource nic2 'Microsoft.Network/networkInterfaces@2020-06-01' = {
             id: vnet.properties.subnets[0].id
           }
           privateIPAllocationMethod: 'Dynamic'
-          publicIPAddress: {
-            id: publicIp2.id
-          }
         }
       }
     ]
