@@ -1,341 +1,268 @@
-#Requires -Version 7.0
-
-<#
-.SYNOPSIS
-    Validation script for Private Endpoint Policies Lab (Modular)
-
-.DESCRIPTION
-    This script validates the Private Endpoint Policies Lab deployment by checking
-    all modular components including client VM, firewall, SQL server, VNet peering,
-    private endpoints, and policy configurations.
-
-.PARAMETER ResourceGroupName
-    Name of the resource group to validate (default: rg-pe-policies-lab)
-
-.PARAMETER SubscriptionId
-    Azure subscription ID (optional)
-
-.PARAMETER SkipConnectivityTests
-    Skip network connectivity tests
-
-.PARAMETER Detailed
-    Show detailed validation information
-
-.EXAMPLE
-    .\validate.ps1 -ResourceGroupName "rg-pe-policies-lab" -Detailed
-#>
+# ============================================================================
+# PE Policies Lab Validation Script
+# ============================================================================
+# Validates the PE/PLS lab deployment and PE Network Policies configuration
+# ============================================================================
 
 param(
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory = $false)]
     [string]$ResourceGroupName = "rg-pe-policies-lab",
     
-    [Parameter(Mandatory=$false)]
-    [string]$SubscriptionId,
-    
-    [Parameter(Mandatory=$false)]
-    [switch]$SkipConnectivityTests,
-    
-    [Parameter(Mandatory=$false)]
-    [switch]$Detailed
+    [Parameter(Mandatory = $false)]
+    [string]$DeploymentPrefix = "pelab"
 )
 
-# Helper functions
-function Write-ColorOutput {
-    param([string]$Message, [string]$Color = "White")
-    $colors = @{ "Red" = [ConsoleColor]::Red; "Green" = [ConsoleColor]::Green; "Yellow" = [ConsoleColor]::Yellow; "Cyan" = [ConsoleColor]::Cyan; "White" = [ConsoleColor]::White }
-    Write-Host $Message -ForegroundColor $colors[$Color]
-}
+# ============================================================================
+# Helper Functions
+# ============================================================================
 
-function Test-AzureConnection {
-    Write-ColorOutput "🔍 Checking Azure connection..." "Cyan"
-    try {
-        $account = az account show --output json 2>$null | ConvertFrom-Json
-        Write-ColorOutput "✅ Connected to Azure as: $($account.user.name)" "Green"
-        return $true
-    } catch {
-        Write-ColorOutput "❌ Not connected to Azure. Please run 'az login'" "Red"
-        return $false
+function Write-Result {
+    param(
+        [string]$Test,
+        [bool]$Passed,
+        [string]$Details = ""
+    )
+    
+    if ($Passed) {
+        Write-Host "✅ PASS: $Test" -ForegroundColor Green
+    }
+    else {
+        Write-Host "❌ FAIL: $Test" -ForegroundColor Red
+    }
+    
+    if ($Details) {
+        Write-Host "   $Details" -ForegroundColor Gray
     }
 }
 
-function Test-ResourceGroupExists {
-    try {
-        $rg = az group show --name $ResourceGroupName --output json 2>$null | ConvertFrom-Json
-        if ($rg) {
-            Write-ColorOutput "✅ Resource group found: $ResourceGroupName" "Green"
-            if ($Detailed) { Write-ColorOutput "   📍 Location: $($rg.location)" "White" }
-            return $true
-        }
-    } catch {}
-    Write-ColorOutput "❌ Resource group not found: $ResourceGroupName" "Red"
-    return $false
+function Write-Header {
+    param([string]$Message)
+    Write-Host ""
+    Write-Host "═══════════════════════════════════════════════════════════════════" -ForegroundColor Cyan
+    Write-Host $Message -ForegroundColor Yellow
+    Write-Host "═══════════════════════════════════════════════════════════════════" -ForegroundColor Cyan
 }
 
-function Get-DeploymentInfo {
-    try {
-        Write-ColorOutput "📋 Getting deployment information..." "Cyan"
-        $deployments = az deployment group list --resource-group $ResourceGroupName --output json | ConvertFrom-Json
-        $latestDeployment = $deployments | Sort-Object properties.timestamp -Descending | Select-Object -First 1
-        
-        if ($latestDeployment) {
-            Write-ColorOutput "✅ Latest deployment: $($latestDeployment.name)" "Green"
-            if ($Detailed) {
-                Write-ColorOutput "   📅 Timestamp: $($latestDeployment.properties.timestamp)" "White"
-                Write-ColorOutput "   📊 Status: $($latestDeployment.properties.provisioningState)" "White"
-                Write-ColorOutput "   ⏱️  Duration: $($latestDeployment.properties.duration)" "White"
-            }
-            return $latestDeployment
-        }
-    } catch {
-        Write-ColorOutput "⚠️  Could not retrieve deployment information" "Yellow"
-    }
-    return $null
+# ============================================================================
+# Main Validation
+# ============================================================================
+
+$ErrorActionPreference = "Continue"
+$passedTests = 0
+$failedTests = 0
+
+Write-Header "PE Policies Lab Validation"
+
+# Check Azure Login
+Write-Host ""
+Write-Host "Checking Azure CLI authentication..." -ForegroundColor Cyan
+$account = az account show 2>&1
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "Not logged in. Please run 'az login' first." -ForegroundColor Red
+    exit 1
+}
+Write-Host "Authenticated successfully." -ForegroundColor Green
+
+# Check Resource Group
+Write-Header "Resource Group Validation"
+$rg = az group show --name $ResourceGroupName --query name -o tsv 2>&1
+if ($LASTEXITCODE -eq 0) {
+    Write-Result -Test "Resource Group Exists" -Passed $true -Details $ResourceGroupName
+    $passedTests++
+}
+else {
+    Write-Result -Test "Resource Group Exists" -Passed $false -Details "Resource group not found"
+    $failedTests++
+    exit 1
 }
 
-function Test-ModularResources {
-    Write-ColorOutput "🏗️  Validating modular resources..." "Cyan"
-    $allResources = az resource list --resource-group $ResourceGroupName --output json | ConvertFrom-Json
-    
-    # Expected resource types for modular deployment
-    $expectedTypes = @{
-        "Microsoft.Compute/virtualMachines" = "Client VMs"
-        "Microsoft.Network/azureFirewalls" = "Azure Firewall"
-        "Microsoft.Sql/servers" = "SQL Server"
-        "Microsoft.Network/privateEndpoints" = "Private Endpoints"
-        "Microsoft.Network/virtualNetworks" = "Virtual Networks"
-        "Microsoft.Network/routeTables" = "Route Tables"
-        "Microsoft.Network/networkSecurityGroups" = "Network Security Groups"
-        "Microsoft.Network/networkInterfaces" = "Network Interfaces"
-        "Microsoft.Storage/storageAccounts" = "Storage Accounts"
-        "Microsoft.Compute/disks" = "VM Disks"
-    }
-    
-    $validationResults = @()
-    
-    foreach ($type in $expectedTypes.GetEnumerator()) {
-        $resources = $allResources | Where-Object { $_.type -eq $type.Key }
-        if ($resources.Count -gt 0) {
-            Write-ColorOutput "✅ $($type.Value): $($resources.Count) found" "Green"
-            if ($Detailed) {
-                foreach ($resource in $resources) {
-                    Write-ColorOutput "   📦 $($resource.name)" "White"
-                }
-            }
-            $validationResults += @{Type = $type.Value; Status = "Found"; Count = $resources.Count}
-        } else {
-            Write-ColorOutput "⚠️  $($type.Value): Not found" "Yellow"
-            $validationResults += @{Type = $type.Value; Status = "Missing"; Count = 0}
-        }
-    }
-    
-    return $validationResults
+# Validate VNets
+Write-Header "Virtual Network Validation"
+
+$clientVnet = az network vnet show --resource-group $ResourceGroupName --name "${DeploymentPrefix}-client-vnet" --query name -o tsv 2>&1
+if ($LASTEXITCODE -eq 0) {
+    Write-Result -Test "Client VNet Exists" -Passed $true -Details "${DeploymentPrefix}-client-vnet"
+    $passedTests++
+}
+else {
+    Write-Result -Test "Client VNet Exists" -Passed $false
+    $failedTests++
 }
 
-function Test-ClientVMModule {
-    Write-ColorOutput "💻 Validating Client VM module..." "Cyan"
-    
-    $vms = az vm list --resource-group $ResourceGroupName --output json | ConvertFrom-Json
-    foreach ($vm in $vms | Where-Object { $_.name -like "*client*" -or $_.name -like "*vm*" }) {
-        $vmStatus = az vm get-instance-view --resource-group $ResourceGroupName --name $vm.name --output json | ConvertFrom-Json
-        $powerState = ($vmStatus.instanceView.statuses | Where-Object { $_.code -like "PowerState/*" }).displayStatus
-        
-        Write-ColorOutput "   ✅ VM: $($vm.name)" "Green"
-        Write-ColorOutput "   🔋 Power State: $powerState" "White"
-        Write-ColorOutput "   💾 VM Size: $($vm.hardwareProfile.vmSize)" "White"
-        
-        if ($Detailed) {
-            Write-ColorOutput "   📍 Location: $($vm.location)" "White"
-            Write-ColorOutput "   🖥️  OS Type: $($vm.storageProfile.osDisk.osType)" "White"
-        }
-    }
+$serviceVnet = az network vnet show --resource-group $ResourceGroupName --name "${DeploymentPrefix}-service-vnet" --query name -o tsv 2>&1
+if ($LASTEXITCODE -eq 0) {
+    Write-Result -Test "Service VNet Exists" -Passed $true -Details "${DeploymentPrefix}-service-vnet"
+    $passedTests++
+}
+else {
+    Write-Result -Test "Service VNet Exists" -Passed $false
+    $failedTests++
 }
 
-function Test-FirewallModule {
-    Write-ColorOutput "🔥 Validating Firewall module..." "Cyan"
-    
-    try {
-        $firewalls = az network firewall list --resource-group $ResourceGroupName --output json | ConvertFrom-Json
-        foreach ($fw in $firewalls) {
-            Write-ColorOutput "   ✅ Firewall: $($fw.name)" "Green"
-            Write-ColorOutput "   📊 Provisioning State: $($fw.provisioningState)" "White"
-            Write-ColorOutput "   🛡️  Threat Intel Mode: $($fw.threatIntelMode)" "White"
-            
-            if ($Detailed) {
-                Write-ColorOutput "   🏷️  SKU Tier: $($fw.sku.tier)" "White"
-                Write-ColorOutput "   📍 Zones: $($fw.zones -join ', ')" "White"
-                
-                # Check firewall policies
-                if ($fw.firewallPolicy) {
-                    Write-ColorOutput "   📋 Policy: $($fw.firewallPolicy.id.Split('/')[-1])" "White"
-                }
-            }
-        }
-    } catch {
-        Write-ColorOutput "   ⚠️  Could not validate firewall details" "Yellow"
-    }
+# Validate PE Network Policies
+Write-Header "PE Network Policies Validation"
+
+$peSubnetPolicies = az network vnet subnet show `
+    --resource-group $ResourceGroupName `
+    --vnet-name "${DeploymentPrefix}-client-vnet" `
+    --name "pe-subnet" `
+    --query "privateEndpointNetworkPolicies" -o tsv 2>&1
+
+if ($peSubnetPolicies -eq "Enabled") {
+    Write-Result -Test "PE Network Policies Enabled on pe-subnet" -Passed $true -Details "privateEndpointNetworkPolicies: Enabled"
+    $passedTests++
+}
+else {
+    Write-Result -Test "PE Network Policies Enabled on pe-subnet" -Passed $false -Details "Expected 'Enabled', got '$peSubnetPolicies'"
+    $failedTests++
 }
 
-function Test-SQLModule {
-    Write-ColorOutput "🗄️  Validating SQL Server module..." "Cyan"
-    
-    try {
-        $sqlServers = az sql server list --resource-group $ResourceGroupName --output json | ConvertFrom-Json
-        foreach ($server in $sqlServers) {
-            Write-ColorOutput "   ✅ SQL Server: $($server.name)" "Green"
-            Write-ColorOutput "   📊 State: $($server.state)" "White"
-            Write-ColorOutput "   🔐 Admin Login: $($server.administratorLogin)" "White"
-            
-            if ($Detailed) {
-                Write-ColorOutput "   🌐 FQDN: $($server.fullyQualifiedDomainName)" "White"
-                Write-ColorOutput "   📍 Location: $($server.location)" "White"
-                
-                # Check databases
-                $databases = az sql db list --resource-group $ResourceGroupName --server $server.name --output json | ConvertFrom-Json
-                foreach ($db in $databases | Where-Object { $_.name -ne "master" }) {
-                    Write-ColorOutput "   💾 Database: $($db.name)" "White"
-                }
-            }
-        }
-    } catch {
-        Write-ColorOutput "   ⚠️  Could not validate SQL server details" "Yellow"
-    }
+# Check NSG on PE Subnet
+$peSubnetNsg = az network vnet subnet show `
+    --resource-group $ResourceGroupName `
+    --vnet-name "${DeploymentPrefix}-client-vnet" `
+    --name "pe-subnet" `
+    --query "networkSecurityGroup.id" -o tsv 2>&1
+
+if ($peSubnetNsg -and $peSubnetNsg -ne "null") {
+    Write-Result -Test "NSG Attached to pe-subnet" -Passed $true -Details "NSG is attached"
+    $passedTests++
+}
+else {
+    Write-Result -Test "NSG Attached to pe-subnet" -Passed $false -Details "No NSG found"
+    $failedTests++
 }
 
-function Test-PrivateEndpoints {
-    Write-ColorOutput "🔒 Validating Private Endpoints..." "Cyan"
-    
-    try {
-        $privateEndpoints = az network private-endpoint list --resource-group $ResourceGroupName --output json | ConvertFrom-Json
-        foreach ($pe in $privateEndpoints) {
-            Write-ColorOutput "   ✅ Private Endpoint: $($pe.name)" "Green"
-            Write-ColorOutput "   📊 Provisioning State: $($pe.provisioningState)" "White"
-            
-            if ($Detailed) {
-                # Check private DNS zones
-                $privateDnsZones = az network private-dns zone list --resource-group $ResourceGroupName --output json | ConvertFrom-Json
-                if ($privateDnsZones) {
-                    Write-ColorOutput "   🌐 Private DNS Zones:" "White"
-                    foreach ($zone in $privateDnsZones) {
-                        Write-ColorOutput "     - $($zone.name)" "White"
-                    }
-                }
-            }
-        }
-    } catch {
-        Write-ColorOutput "   ⚠️  Could not validate private endpoint details" "Yellow"
-    }
+# Validate Private Link Service
+Write-Header "Private Link Service Validation"
+
+$pls = az network private-link-service show `
+    --resource-group $ResourceGroupName `
+    --name "${DeploymentPrefix}-pls" `
+    --query name -o tsv 2>&1
+
+if ($LASTEXITCODE -eq 0) {
+    Write-Result -Test "Private Link Service Exists" -Passed $true -Details "${DeploymentPrefix}-pls"
+    $passedTests++
+}
+else {
+    Write-Result -Test "Private Link Service Exists" -Passed $false
+    $failedTests++
 }
 
-function Test-NetworkConnectivity {
-    if ($SkipConnectivityTests) {
-        Write-ColorOutput "⏭️  Skipping network connectivity tests" "Yellow"
-        return
-    }
+# Validate Private Endpoint
+Write-Header "Private Endpoint Validation"
+
+$pe = az network private-endpoint show `
+    --resource-group $ResourceGroupName `
+    --name "${DeploymentPrefix}-pe" `
+    --query name -o tsv 2>&1
+
+if ($LASTEXITCODE -eq 0) {
+    Write-Result -Test "Private Endpoint Exists" -Passed $true -Details "${DeploymentPrefix}-pe"
+    $passedTests++
     
-    Write-ColorOutput "🌐 Testing network connectivity..." "Cyan"
+    # Get PE IP
+    $peNicId = az network private-endpoint show `
+        --resource-group $ResourceGroupName `
+        --name "${DeploymentPrefix}-pe" `
+        --query "networkInterfaces[0].id" -o tsv 2>&1
     
-    # Test VNet peering
-    try {
-        $vnets = az network vnet list --resource-group $ResourceGroupName --output json | ConvertFrom-Json
-        foreach ($vnet in $vnets) {
-            $peerings = az network vnet peering list --resource-group $ResourceGroupName --vnet-name $vnet.name --output json | ConvertFrom-Json
-            if ($peerings) {
-                Write-ColorOutput "   ✅ VNet Peerings found for: $($vnet.name)" "Green"
-                if ($Detailed) {
-                    foreach ($peering in $peerings) {
-                        Write-ColorOutput "     📡 $($peering.name): $($peering.peeringState)" "White"
-                    }
-                }
-            }
-        }
-    } catch {
-        Write-ColorOutput "   ⚠️  Could not test VNet peering" "Yellow"
-    }
-    
-    # Test route tables
-    try {
-        $routeTables = az network route-table list --resource-group $ResourceGroupName --output json | ConvertFrom-Json
-        foreach ($rt in $routeTables) {
-            Write-ColorOutput "   ✅ Route Table: $($rt.name)" "Green"
-            if ($Detailed) {
-                $routes = az network route-table route list --resource-group $ResourceGroupName --route-table-name $rt.name --output json | ConvertFrom-Json
-                Write-ColorOutput "     🗺️  Routes: $($routes.Count)" "White"
-            }
-        }
-    } catch {
-        Write-ColorOutput "   ⚠️  Could not validate route tables" "Yellow"
+    if ($peNicId) {
+        $peIp = az network nic show --ids $peNicId --query "ipConfigurations[0].privateIPAddress" -o tsv 2>&1
+        Write-Result -Test "Private Endpoint IP Retrieved" -Passed $true -Details "IP: $peIp"
+        $passedTests++
     }
 }
-
-function Show-ValidationSummary {
-    param([array]$Results)
-    
-    Write-ColorOutput "📊 VALIDATION SUMMARY" "Cyan"
-    Write-ColorOutput "=====================" "Cyan"
-    
-    $foundCount = ($Results | Where-Object { $_.Status -eq "Found" }).Count
-    $missingCount = ($Results | Where-Object { $_.Status -eq "Missing" }).Count
-    
-    Write-ColorOutput "✅ Resources Found: $foundCount" "Green"
-    if ($missingCount -gt 0) {
-        Write-ColorOutput "⚠️  Resources Missing: $missingCount" "Yellow"
-    }
-    
-    # Calculate estimated monthly cost
-    $totalCost = 0
-    foreach ($result in $Results | Where-Object { $_.Status -eq "Found" }) {
-        switch ($result.Type) {
-            "Azure Firewall" { $totalCost += 912 }
-            "SQL Server" { $totalCost += 200 }
-            "Client VMs" { $totalCost += ($result.Count * 35) }
-            "Private Endpoints" { $totalCost += ($result.Count * 7) }
-            "Virtual Networks" { $totalCost += 10 }
-        }
-    }
-    
-    if ($totalCost -gt 0) {
-        Write-ColorOutput "💰 Estimated Monthly Cost: ~$$totalCost" "Yellow"
-    }
-    
-    $overallStatus = if ($missingCount -eq 0) { "HEALTHY" } else { "NEEDS ATTENTION" }
-    $color = if ($missingCount -eq 0) { "Green" } else { "Yellow" }
-    Write-ColorOutput "🎯 Overall Status: $overallStatus" $color
+else {
+    Write-Result -Test "Private Endpoint Exists" -Passed $false
+    $failedTests++
 }
 
-# Main script
-Write-ColorOutput "✅ Private Endpoint Policies Lab (Modular) Validation" "Cyan"
-Write-ColorOutput "======================================================" "Cyan"
+# Validate VMs
+Write-Header "Virtual Machine Validation"
 
-if (-not (Test-AzureConnection)) { exit 1 }
-
-if (-not (Test-ResourceGroupExists)) { exit 1 }
-
-if ($SubscriptionId) {
-    az account set --subscription $SubscriptionId
+$clientVm = az vm show --resource-group $ResourceGroupName --name "${DeploymentPrefix}-client-vm" --query name -o tsv 2>&1
+if ($LASTEXITCODE -eq 0) {
+    Write-Result -Test "Client VM Exists" -Passed $true -Details "${DeploymentPrefix}-client-vm"
+    $passedTests++
+}
+else {
+    Write-Result -Test "Client VM Exists" -Passed $false
+    $failedTests++
 }
 
-Write-ColorOutput "" "White"
-Write-ColorOutput "🏗️  VALIDATING: MODULAR PRIVATE ENDPOINT POLICIES LAB" "Cyan"
-Write-ColorOutput "====================================================" "Cyan"
+$webVm = az vm show --resource-group $ResourceGroupName --name "${DeploymentPrefix}-web-vm" --query name -o tsv 2>&1
+if ($LASTEXITCODE -eq 0) {
+    Write-Result -Test "Web Server VM Exists" -Passed $true -Details "${DeploymentPrefix}-web-vm"
+    $passedTests++
+}
+else {
+    Write-Result -Test "Web Server VM Exists" -Passed $false
+    $failedTests++
+}
 
-$deploymentInfo = Get-DeploymentInfo
-$validationResults = Test-ModularResources
+# Validate Bastion
+Write-Header "Bastion Validation"
 
-Write-ColorOutput "" "White"
-Test-ClientVMModule
-Write-ColorOutput "" "White"
-Test-FirewallModule
-Write-ColorOutput "" "White"
-Test-SQLModule
-Write-ColorOutput "" "White"
-Test-PrivateEndpoints
-Write-ColorOutput "" "White"
-Test-NetworkConnectivity
+$bastion = az network bastion show --resource-group $ResourceGroupName --name "${DeploymentPrefix}-bastion" --query name -o tsv 2>&1
+if ($LASTEXITCODE -eq 0) {
+    Write-Result -Test "Azure Bastion Exists" -Passed $true -Details "${DeploymentPrefix}-bastion"
+    $passedTests++
+}
+else {
+    Write-Result -Test "Azure Bastion Exists" -Passed $false
+    $failedTests++
+}
 
-Write-ColorOutput "" "White"
-Show-ValidationSummary -Results $validationResults
+# Validate Internal Load Balancer
+Write-Header "Load Balancer Validation"
 
-Write-ColorOutput "" "White"
-Write-ColorOutput "🎉 Validation completed!" "Green"
-Write-ColorOutput "💡 Use -Detailed for more comprehensive information" "Cyan"
-Write-ColorOutput "💡 Use -SkipConnectivityTests to skip network tests" "Cyan"
+$ilb = az network lb show --resource-group $ResourceGroupName --name "${DeploymentPrefix}-ilb" --query name -o tsv 2>&1
+if ($LASTEXITCODE -eq 0) {
+    Write-Result -Test "Internal Load Balancer Exists" -Passed $true -Details "${DeploymentPrefix}-ilb"
+    $passedTests++
+}
+else {
+    Write-Result -Test "Internal Load Balancer Exists" -Passed $false
+    $failedTests++
+}
+
+# Check for Optional Azure Firewall
+Write-Header "Optional Azure Firewall Check"
+
+$fw = az network firewall show --resource-group $ResourceGroupName --name "${DeploymentPrefix}-fw" --query name -o tsv 2>&1
+if ($LASTEXITCODE -eq 0) {
+    Write-Result -Test "Azure Firewall Deployed" -Passed $true -Details "${DeploymentPrefix}-fw (Optional feature enabled)"
+    $passedTests++
+    
+    # Check Route Table
+    $rt = az network route-table show --resource-group $ResourceGroupName --name "${DeploymentPrefix}-rt-pe-subnet" --query name -o tsv 2>&1
+    if ($LASTEXITCODE -eq 0) {
+        Write-Result -Test "Route Table for PE Subnet" -Passed $true -Details "Traffic routed through firewall"
+        $passedTests++
+    }
+}
+else {
+    Write-Host "ℹ️  Azure Firewall not deployed (optional feature)" -ForegroundColor Gray
+}
+
+# Summary
+Write-Header "Validation Summary"
+Write-Host ""
+Write-Host "Passed Tests: $passedTests" -ForegroundColor Green
+Write-Host "Failed Tests: $failedTests" -ForegroundColor $(if ($failedTests -eq 0) { "Green" } else { "Red" })
+Write-Host ""
+
+if ($failedTests -eq 0) {
+    Write-Host "✅ All validations passed! Lab is ready for testing." -ForegroundColor Green
+    Write-Host ""
+    Write-Host "Next Steps:" -ForegroundColor Yellow
+    Write-Host "1. Connect to Client VM via Bastion" -ForegroundColor White
+    Write-Host "2. Test connectivity to PE IP using:" -ForegroundColor White
+    Write-Host "   Test-NetConnection -ComputerName $peIp -Port 80" -ForegroundColor Cyan
+    Write-Host "   Invoke-WebRequest -Uri http://$peIp -UseBasicParsing" -ForegroundColor Cyan
+}
+else {
+    Write-Host "⚠️  Some validations failed. Please check the deployment." -ForegroundColor Yellow
+}

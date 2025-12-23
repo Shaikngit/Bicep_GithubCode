@@ -1,228 +1,376 @@
-#Requires -Version 7.0
+# ============================================================================
+# PE Policies Lab Deployment Script
+# ============================================================================
+# Deploys Private Endpoint / Private Link Service lab with optional Azure Firewall
+#
+# Usage:
+#   .\deploy.ps1                           # Deploy without Azure Firewall
+#   .\deploy.ps1 -DeployAzureFirewall      # Deploy with Azure Firewall
+#   .\deploy.ps1 -Cleanup                  # Delete resource group
+# ============================================================================
 
-<#
-.SYNOPSIS
-    Deploys Private Endpoint Policies Lab with modular architecture
-
-.DESCRIPTION
-    This script deploys a comprehensive Private Endpoint policies lab with
-    client VM, firewall, SQL server, VNet peerings, and route tables using modular Bicep templates.
-
-.PARAMETER ResourceGroupName
-    Name of the resource group to deploy to (default: rg-pe-policies-lab)
-
-.PARAMETER Location
-    Azure region for deployment (default: southeastasia)
-
-.PARAMETER AdminPassword
-    Administrator password for the VMs and SQL server
-
-.PARAMETER AdminUsername
-    Administrator username for the VMs and SQL server
-
-.PARAMETER AllowedRdpSourceAddress
-    Source IP address or CIDR range allowed for RDP access
-
-.PARAMETER VmSizeOption
-    VM size option - Overlake or Non-Overlake
-
-.PARAMETER UseCustomImage
-    Use custom image from gallery (default: No)
-
-.PARAMETER Force
-    Skip confirmation prompts
-
-.PARAMETER WhatIf
-    Preview deployment without making changes
-
-.EXAMPLE
-    .\deploy.ps1 -AdminPassword "YourStrongPassword123!" -AdminUsername "azureuser" -AllowedRdpSourceAddress "203.0.113.0/24" -VmSizeOption "Non-Overlake"
-#>
-
+[CmdletBinding()]
 param(
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory = $false)]
     [string]$ResourceGroupName = "rg-pe-policies-lab",
     
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory = $false)]
     [string]$Location = "southeastasia",
     
-    [Parameter(Mandatory=$true)]
-    [string]$AdminPassword,
+    [Parameter(Mandatory = $false)]
+    [string]$DeploymentPrefix = "pelab",
     
-    [Parameter(Mandatory=$true)]
-    [string]$AdminUsername,
+    [Parameter(Mandatory = $false)]
+    [string]$AdminUsername = "azureuser",
     
-    [Parameter(Mandatory=$true)]
-    [string]$AllowedRdpSourceAddress,
+    [Parameter(Mandatory = $false)]
+    [string]$AdminPassword = "Wipro@12345678",
     
-    [Parameter(Mandatory=$true)]
-    [ValidateSet("Overlake", "Non-Overlake")]
-    [string]$VmSizeOption,
+    [Parameter(Mandatory = $false)]
+    [switch]$DeployAzureFirewall,
     
-    [Parameter(Mandatory=$false)]
-    [ValidateSet("Yes", "No")]
-    [string]$UseCustomImage = "No",
-    
-    [Parameter(Mandatory=$false)]
-    [string]$SubscriptionId,
-    
-    [Parameter(Mandatory=$false)]
-    [switch]$WhatIf,
-    
-    [Parameter(Mandatory=$false)]
-    [switch]$Force
+    [Parameter(Mandatory = $false)]
+    [switch]$Cleanup
 )
 
-# Helper functions
-function Write-ColorOutput {
-    param([string]$Message, [string]$Color = "White")
-    $colors = @{ "Red" = [ConsoleColor]::Red; "Green" = [ConsoleColor]::Green; "Yellow" = [ConsoleColor]::Yellow; "Cyan" = [ConsoleColor]::Cyan; "White" = [ConsoleColor]::White }
-    Write-Host $Message -ForegroundColor $colors[$Color]
+# ============================================================================
+# Helper Functions
+# ============================================================================
+
+function Write-Header {
+    param([string]$Message)
+    Write-Host ""
+    Write-Host "=" * 80 -ForegroundColor Cyan
+    Write-Host $Message -ForegroundColor Yellow
+    Write-Host "=" * 80 -ForegroundColor Cyan
 }
 
-function Test-Prerequisites {
-    Write-ColorOutput "🔍 Checking prerequisites..." "Cyan"
-    $allGood = $true
+function Write-Step {
+    param([string]$Message)
+    Write-Host "[STEP] $Message" -ForegroundColor Green
+}
+
+function Write-Info {
+    param([string]$Message)
+    Write-Host "[INFO] $Message" -ForegroundColor Gray
+}
+
+function Show-ArchitectureDiagram {
+    param([bool]$WithFirewall)
     
-    try { $version = az version --output json 2>$null | ConvertFrom-Json; Write-ColorOutput "✅ Azure CLI version: $($version.'azure-cli')" "Green" }
-    catch { Write-ColorOutput "❌ Azure CLI not found" "Red"; $allGood = $false }
+    Write-Header "Architecture Diagram"
     
-    try { $account = az account show --output json 2>$null | ConvertFrom-Json; Write-ColorOutput "✅ Logged into Azure as: $($account.user.name)" "Green" }
-    catch { Write-ColorOutput "❌ Not logged into Azure" "Red"; $allGood = $false }
+    if ($WithFirewall) {
+        Write-Host @"
+
+    WITH AZURE FIREWALL - PE Policies Lab Architecture
+    ==================================================
     
-    try { $version = az bicep version; Write-ColorOutput "✅ Bicep CLI version: $version" "Green" }
-    catch { Write-ColorOutput "❌ Bicep CLI not found" "Red"; $allGood = $false }
-    
-    # Check for module files
-    $modules = @("clientVM/client.bicep", "firewall/firewall.bicep", "pesqlserver/sqlserver.bicep")
-    foreach ($module in $modules) {
-        if (Test-Path $module) {
-            Write-ColorOutput "✅ Module found: $module" "Green"
-        } else {
-            Write-ColorOutput "❌ Module missing: $module" "Red"
-            $allGood = $false
-        }
+    ┌─────────────────────────────────────────────────────────────────────────────┐
+    │                         CLIENT VNET (10.10.0.0/16)                          │
+    │  ┌──────────────────────────────────────────────────────────────────────┐   │
+    │  │  vm-subnet (10.10.0.0/24)                                            │   │
+    │  │  ┌─────────────┐                                                     │   │
+    │  │  │  Client VM  │ ──────────────┐                                     │   │
+    │  │  │  (Windows)  │               │                                     │   │
+    │  │  └─────────────┘               │                                     │   │
+    │  └────────────────────────────────┼─────────────────────────────────────┘   │
+    │                                   │                                         │
+    │  ┌────────────────────────────────▼─────────────────────────────────────┐   │
+    │  │  AzureFirewallSubnet (10.10.3.0/24)                                  │   │
+    │  │  ┌──────────────────────┐                                            │   │
+    │  │  │    Azure Firewall    │ (Network Rules: Allow HTTP/HTTPS)          │   │
+    │  │  └──────────┬───────────┘                                            │   │
+    │  └─────────────┼────────────────────────────────────────────────────────┘   │
+    │                │                                                            │
+    │  ┌─────────────▼────────────────────────────────────────────────────────┐   │
+    │  │  pe-subnet (10.10.1.0/24) [NSG + Route Table + PE Network Policies]  │   │
+    │  │  ┌───────────────────────┐                                           │   │
+    │  │  │   Private Endpoint    │ ─────────────────┐                        │   │
+    │  │  │   (PE to PLS)         │                  │                        │   │
+    │  │  └───────────────────────┘                  │                        │   │
+    │  └─────────────────────────────────────────────┼────────────────────────┘   │
+    │                                                │                            │
+    │  ┌─────────────────────────────────────────────┼────────────────────────┐   │
+    │  │  AzureBastionSubnet (10.10.2.0/24)          │                        │   │
+    │  │  ┌─────────────┐                            │                        │   │
+    │  │  │   Bastion   │ (Secure VM Access)         │                        │   │
+    │  │  └─────────────┘                            │ Private Link           │   │
+    │  └─────────────────────────────────────────────┼────────────────────────┘   │
+    └────────────────────────────────────────────────┼────────────────────────────┘
+                                                     │
+                              ═══════════════════════╪═══════════════════════════
+                                    VNet Peering     │    (Firewall Routes)
+                              ═══════════════════════╪═══════════════════════════
+                                                     │
+    ┌────────────────────────────────────────────────┼────────────────────────────┐
+    │                        SERVICE VNET (10.20.0.0/16)                          │
+    │  ┌─────────────────────────────────────────────┼────────────────────────┐   │
+    │  │  pls-subnet (10.20.1.0/24)                  │                        │   │
+    │  │  ┌───────────────────────┐                  │                        │   │
+    │  │  │ Private Link Service  │ ◄────────────────┘                        │   │
+    │  │  │    (PLS to ILB)       │                                           │   │
+    │  │  └───────────┬───────────┘                                           │   │
+    │  └──────────────┼───────────────────────────────────────────────────────┘   │
+    │                 │                                                           │
+    │  ┌──────────────▼───────────────────────────────────────────────────────┐   │
+    │  │  web-subnet (10.20.0.0/24)                                           │   │
+    │  │  ┌───────────────────────┐      ┌─────────────────────────────────┐  │   │
+    │  │  │  Internal Load        │──────│        IIS Web Server VM        │  │   │
+    │  │  │  Balancer (ILB)       │      │    (Windows Server + IIS)       │  │   │
+    │  │  └───────────────────────┘      └─────────────────────────────────┘  │   │
+    │  └──────────────────────────────────────────────────────────────────────┘   │
+    └─────────────────────────────────────────────────────────────────────────────┘
+
+    Traffic Flow:
+    Client VM → Route Table → Azure Firewall → Private Endpoint → PLS → ILB → IIS
+
+    PE Network Policies:
+    - NSG on pe-subnet controls traffic to Private Endpoint
+    - Route Table forces traffic through Azure Firewall
+    - privateEndpointNetworkPolicies: 'Enabled'
+
+"@ -ForegroundColor White
     }
+    else {
+        Write-Host @"
+
+    WITHOUT AZURE FIREWALL - PE Policies Lab Architecture
+    =====================================================
     
-    # Password validation
-    if ($AdminPassword.Length -ge 12 -and $AdminPassword -cmatch '[A-Z]' -and $AdminPassword -cmatch '[a-z]' -and $AdminPassword -match '\d' -and $AdminPassword -match '[^A-Za-z0-9]') {
-        Write-ColorOutput "✅ Password meets complexity requirements" "Green"
-    } else {
-        Write-ColorOutput "❌ Password must be 12+ characters with uppercase, lowercase, digit, and special character" "Red"
-        $allGood = $false
+    ┌─────────────────────────────────────────────────────────────────────────────┐
+    │                         CLIENT VNET (10.10.0.0/16)                          │
+    │  ┌──────────────────────────────────────────────────────────────────────┐   │
+    │  │  vm-subnet (10.10.0.0/24)                                            │   │
+    │  │  ┌─────────────┐                                                     │   │
+    │  │  │  Client VM  │ ────────────────────────────────────┐               │   │
+    │  │  │  (Windows)  │                                     │               │   │
+    │  │  └─────────────┘                                     │               │   │
+    │  └──────────────────────────────────────────────────────┼───────────────┘   │
+    │                                                         │                   │
+    │  ┌──────────────────────────────────────────────────────▼───────────────┐   │
+    │  │  pe-subnet (10.10.1.0/24) [NSG + PE Network Policies Enabled]        │   │
+    │  │  ┌───────────────────────┐                                           │   │
+    │  │  │   Private Endpoint    │ ─────────────────────────────────┐        │   │
+    │  │  │   (PE to PLS)         │                                  │        │   │
+    │  │  └───────────────────────┘                                  │        │   │
+    │  └─────────────────────────────────────────────────────────────┼────────┘   │
+    │                                                                │            │
+    │  ┌─────────────────────────────────────────────────────────────┼────────┐   │
+    │  │  AzureBastionSubnet (10.10.2.0/24)                          │        │   │
+    │  │  ┌─────────────┐                                            │        │   │
+    │  │  │   Bastion   │ (Secure VM Access)                         │        │   │
+    │  │  └─────────────┘                             Private Link   │        │   │
+    │  └─────────────────────────────────────────────────────────────┼────────┘   │
+    └────────────────────────────────────────────────────────────────┼────────────┘
+                                                                     │
+                              ═══════════════════════════════════════╪════════════
+                                    Private Link (No VNet Peering)   │
+                              ═══════════════════════════════════════╪════════════
+                                                                     │
+    ┌────────────────────────────────────────────────────────────────┼────────────┐
+    │                        SERVICE VNET (10.20.0.0/16)             │            │
+    │  ┌─────────────────────────────────────────────────────────────┼────────┐   │
+    │  │  pls-subnet (10.20.1.0/24)                                  │        │   │
+    │  │  ┌───────────────────────┐                                  │        │   │
+    │  │  │ Private Link Service  │ ◄────────────────────────────────┘        │   │
+    │  │  │    (PLS to ILB)       │                                           │   │
+    │  │  └───────────┬───────────┘                                           │   │
+    │  └──────────────┼───────────────────────────────────────────────────────┘   │
+    │                 │                                                           │
+    │  ┌──────────────▼───────────────────────────────────────────────────────┐   │
+    │  │  web-subnet (10.20.0.0/24)                                           │   │
+    │  │  ┌───────────────────────┐      ┌─────────────────────────────────┐  │   │
+    │  │  │  Internal Load        │──────│        IIS Web Server VM        │  │   │
+    │  │  │  Balancer (ILB)       │      │    (Windows Server + IIS)       │  │   │
+    │  │  └───────────────────────┘      └─────────────────────────────────┘  │   │
+    │  └──────────────────────────────────────────────────────────────────────┘   │
+    └─────────────────────────────────────────────────────────────────────────────┘
+
+    Traffic Flow:
+    Client VM → Private Endpoint → Private Link Service → Internal LB → IIS
+
+    PE Network Policies:
+    - NSG on pe-subnet controls traffic to Private Endpoint
+    - privateEndpointNetworkPolicies: 'Enabled' allows NSG rules
+    - No Route Table (direct PE connection)
+
+"@ -ForegroundColor White
     }
-    
-    return $allGood
 }
 
-function Get-PublicIP {
-    try {
-        $ip = (Invoke-WebRequest -Uri "https://api.ipify.org" -UseBasicParsing).Content.Trim()
-        return "$ip/32"
-    } catch { return $AllowedRdpSourceAddress }
-}
-
-function Get-UserConfirmation {
-    if ($Force) { return $true }
-    
-    Write-ColorOutput "⚠️  This deployment will create multiple Azure resources and may incur significant costs." "Yellow"
-    Write-ColorOutput "⚠️  Azure Firewall Standard: ~$1.25/hour (~$912/month)" "Yellow"
-    Write-ColorOutput "⚠️  Azure SQL Database: ~$150-300/month" "Yellow"
-    Write-ColorOutput "⚠️  VMs (B2s): ~$30-40/month each" "Yellow"
-    Write-ColorOutput "⚠️  Private Endpoints: ~$7/month each" "Yellow"
-    Write-ColorOutput "⚠️  Virtual Networks: ~$10/month" "Yellow"
-    Write-ColorOutput "⚠️  Total estimated cost: ~$1200+/month" "Yellow"
-    
-    $response = Read-Host "Do you want to continue with this high-cost modular deployment? (y/N)"
-    return ($response -eq 'y' -or $response -eq 'Y')
-}
-
-function Start-Deployment {
-    $deploymentName = "pe-policies-lab-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
-    
-    if ($SubscriptionId) { az account set --subscription $SubscriptionId }
-    
-    if ($AllowedRdpSourceAddress -eq "*") {
-        $publicIP = Get-PublicIP
-        $AllowedRdpSourceAddress = $publicIP
-        Write-ColorOutput "🌐 Auto-detected public IP: $AllowedRdpSourceAddress" "Cyan"
-    }
-    
-    Write-ColorOutput "📦 Creating resource group: $ResourceGroupName" "Cyan"
-    az group create --name $ResourceGroupName --location $Location --output none
-    
-    if ($LASTEXITCODE -ne 0) { Write-ColorOutput "❌ Failed to create resource group" "Red"; exit 1 }
-    
-    $deployCmd = @(
-        "az", "deployment", "group", "create"
-        "--resource-group", $ResourceGroupName
-        "--template-file", "main.bicep"
-        "--name", $deploymentName
-        "--parameters"
-        "adminpassword=$AdminPassword"
-        "adminusername=$AdminUsername"
-        "allowedRdpSourceAddress=$AllowedRdpSourceAddress"
-        "vmSizeOption=$VmSizeOption"
-        "useCustomImage=$UseCustomImage"
+function Show-PostDeploymentInstructions {
+    param(
+        [string]$ResourceGroup,
+        [string]$DeploymentPrefix,
+        [bool]$WithFirewall
     )
     
-    if ($WhatIf) {
-        $deployCmd += @("--what-if")
-        Write-ColorOutput "🔍 Running what-if analysis for modular deployment..." "Cyan"
-    } else {
-        Write-ColorOutput "🚀 Starting modular deployment: $deploymentName" "Cyan"
-        Write-ColorOutput "📄 Main template: main.bicep" "White"
-        Write-ColorOutput "📦 Modules: client VM, firewall, SQL server" "White"
-        Write-ColorOutput "🏗️  Deploying comprehensive Private Endpoint policies lab..." "Cyan"
-        Write-ColorOutput "⏱️  Estimated duration: 45-60 minutes (complex modular deployment)" "Yellow"
+    Write-Header "Post-Deployment Test Instructions"
+    
+    # Get Private Endpoint IP
+    Write-Step "Retrieving Private Endpoint IP address..."
+    $peIp = az network private-endpoint show `
+        --name "${DeploymentPrefix}-pe" `
+        --resource-group $ResourceGroup `
+        --query "customDnsConfigs[0].ipAddresses[0]" `
+        --output tsv 2>$null
+    
+    if (-not $peIp) {
+        $peIp = az network private-endpoint show `
+            --name "${DeploymentPrefix}-pe" `
+            --resource-group $ResourceGroup `
+            --query "networkInterfaces[0].id" `
+            --output tsv 2>$null
+        
+        if ($peIp) {
+            $peIp = az network nic show --ids $peIp --query "ipConfigurations[0].privateIPAddress" --output tsv 2>$null
+        }
     }
     
-    & $deployCmd[0] $deployCmd[1..($deployCmd.Length-1)]
+    if (-not $peIp) {
+        $peIp = "<PE_IP_ADDRESS>"
+        Write-Host "[WARN] Could not retrieve PE IP. Run this to get it:" -ForegroundColor Yellow
+        Write-Host "az network private-endpoint show --name ${DeploymentPrefix}-pe --resource-group $ResourceGroup --query networkInterfaces[0].id -o tsv | % { az network nic show --ids `$_ --query ipConfigurations[0].privateIPAddress -o tsv }" -ForegroundColor Cyan
+    }
     
-    if ($LASTEXITCODE -eq 0) {
-        Write-ColorOutput "✅ Modular deployment completed successfully!" "Green"
-        if (-not $WhatIf) {
-            Write-ColorOutput "📊 Deployment outputs:" "Cyan"
-            az deployment group show --resource-group $ResourceGroupName --name $deploymentName --query "properties.outputs" --output table 2>/dev/null
-            
-            Write-ColorOutput "" "White"
-            Write-ColorOutput "🔐 Private Endpoint Policies Lab deployed with:" "Green"
-            Write-ColorOutput "   • Client VM for testing" "White"
-            Write-ColorOutput "   • Azure Firewall for network security" "White"
-            Write-ColorOutput "   • SQL Server with private endpoint" "White"
-            Write-ColorOutput "   • VNet peering and route tables" "White"
-        }
-    } else { Write-ColorOutput "❌ Modular deployment failed" "Red"; exit 1 }
+    Write-Host ""
+    Write-Host "═══════════════════════════════════════════════════════════════════════════════" -ForegroundColor Cyan
+    Write-Host "                         TEST ACTION ITEMS                                     " -ForegroundColor Yellow
+    Write-Host "═══════════════════════════════════════════════════════════════════════════════" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "Private Endpoint IP: " -NoNewline -ForegroundColor White
+    Write-Host $peIp -ForegroundColor Green
+    Write-Host ""
+    Write-Host "STEP 1: Connect to Client VM via Azure Bastion" -ForegroundColor Yellow
+    Write-Host "────────────────────────────────────────────────" -ForegroundColor Gray
+    Write-Host "   - Go to Azure Portal → Resource Group: $ResourceGroup" -ForegroundColor White
+    Write-Host "   - Select VM: ${DeploymentPrefix}-client-vm" -ForegroundColor White
+    Write-Host "   - Click 'Connect' → 'Bastion'" -ForegroundColor White
+    Write-Host "   - Username: $AdminUsername" -ForegroundColor Cyan
+    Write-Host "   - Password: (the password you used during deployment)" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "STEP 2: Test PE Connectivity from Client VM" -ForegroundColor Yellow
+    Write-Host "────────────────────────────────────────────────" -ForegroundColor Gray
+    Write-Host "   Open PowerShell on Client VM and run:" -ForegroundColor White
+    Write-Host ""
+    Write-Host "   # Test 1: Basic connectivity to PE IP" -ForegroundColor Gray
+    Write-Host "   Test-NetConnection -ComputerName $peIp -Port 80" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "   # Test 2: HTTP request to IIS via PE" -ForegroundColor Gray
+    Write-Host "   Invoke-WebRequest -Uri http://$peIp -UseBasicParsing" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "   # Test 3: View the webpage content" -ForegroundColor Gray
+    Write-Host "   (Invoke-WebRequest -Uri http://$peIp -UseBasicParsing).Content" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "STEP 3: Verify PE Network Policies" -ForegroundColor Yellow
+    Write-Host "────────────────────────────────────────────────" -ForegroundColor Gray
+    Write-Host "   - In Azure Portal, go to Client VNet → pe-subnet" -ForegroundColor White
+    Write-Host "   - Verify 'Private endpoint network policies' is Enabled" -ForegroundColor White
+    Write-Host "   - Check NSG '${DeploymentPrefix}-pe-nsg' is attached" -ForegroundColor White
+    Write-Host "   - Review NSG rules (AllowHTTPInbound, DenyAllOtherInbound)" -ForegroundColor White
+    
+    if ($WithFirewall) {
+        Write-Host ""
+        Write-Host "STEP 4: Verify Firewall Traffic (With Firewall)" -ForegroundColor Yellow
+        Write-Host "────────────────────────────────────────────────" -ForegroundColor Gray
+        Write-Host "   - Go to Azure Firewall → Logs" -ForegroundColor White
+        Write-Host "   - Check Network Rule logs for HTTP traffic" -ForegroundColor White
+        Write-Host "   - Verify traffic from Client VM subnet to Service VNet" -ForegroundColor White
+        Write-Host "   - Route Table forces PE traffic through firewall" -ForegroundColor White
+    }
+    
+    Write-Host ""
+    Write-Host "═══════════════════════════════════════════════════════════════════════════════" -ForegroundColor Cyan
+    Write-Host "                         EXPECTED RESULTS                                      " -ForegroundColor Yellow
+    Write-Host "═══════════════════════════════════════════════════════════════════════════════" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "   ✓ Test-NetConnection should show TcpTestSucceeded: True" -ForegroundColor Green
+    Write-Host "   ✓ Invoke-WebRequest should return StatusCode: 200" -ForegroundColor Green
+    Write-Host "   ✓ Web content should show 'Success! You have reached the IIS Web Server'" -ForegroundColor Green
+    Write-Host "   ✓ NSG rules on pe-subnet are applied to PE traffic" -ForegroundColor Green
+    if ($WithFirewall) {
+        Write-Host "   ✓ Firewall logs show allowed HTTP traffic" -ForegroundColor Green
+    }
+    Write-Host ""
+    Write-Host "═══════════════════════════════════════════════════════════════════════════════" -ForegroundColor Cyan
 }
 
-# Main script
-Write-ColorOutput "🔐 Private Endpoint Policies Lab (Modular) Deployment" "Cyan"
-Write-ColorOutput "====================================================" "Cyan"
+# ============================================================================
+# Main Execution
+# ============================================================================
 
-if (-not (Test-Prerequisites)) { exit 1 }
+$ErrorActionPreference = "Stop"
+$startTime = Get-Date
 
-Write-ColorOutput "" "White"
-Write-ColorOutput "🏗️  PRIVATE ENDPOINT POLICIES LAB (MODULAR)" "Cyan"
-Write-ColorOutput "=============================================" "Cyan"
-Write-ColorOutput "This modular deployment creates:" "White"
-Write-ColorOutput "• Client VM module (clientVM/client.bicep)" "White"
-Write-ColorOutput "• Firewall module (firewall/firewall.bicep)" "White"
-Write-ColorOutput "• SQL Server module (pesqlserver/sqlserver.bicep)" "White"
-Write-ColorOutput "• VNet peering and route tables" "White"
-Write-ColorOutput "• Private endpoint policies configuration" "White"
-Write-ColorOutput "" "White"
-Write-ColorOutput "Deployment Details:" "White"
-Write-ColorOutput "• Resource Group: $ResourceGroupName" "White"
-Write-ColorOutput "• Location: $Location" "White"
-Write-ColorOutput "• VM Size Option: $VmSizeOption" "White"
-Write-ColorOutput "• Custom Image: $UseCustomImage" "White"
-Write-ColorOutput "• Allowed RDP Source: $AllowedRdpSourceAddress" "White"
-Write-ColorOutput "• Deployment Type: Modular (main + 3 modules)" "White"
-Write-ColorOutput "=============================================" "Cyan"
-
-if (-not (Get-UserConfirmation)) {
-    Write-ColorOutput "❌ Deployment cancelled by user." "Red"; exit 1
+# Handle Cleanup
+if ($Cleanup) {
+    Write-Header "Cleanup: Deleting Resource Group"
+    Write-Step "Deleting resource group: $ResourceGroupName"
+    az group delete --name $ResourceGroupName --yes --no-wait
+    Write-Host "Resource group deletion initiated. It will be deleted in the background." -ForegroundColor Green
+    exit 0
 }
 
-Start-Deployment
-Write-ColorOutput "🎉 Script execution completed!" "Green"
+# Show Architecture
+Show-ArchitectureDiagram -WithFirewall:$DeployAzureFirewall
+
+# Confirm Deployment
+Write-Header "Deployment Configuration"
+Write-Host "Resource Group    : $ResourceGroupName" -ForegroundColor White
+Write-Host "Location          : $Location" -ForegroundColor White
+Write-Host "Deployment Prefix : $DeploymentPrefix" -ForegroundColor White
+Write-Host "Admin Username    : $AdminUsername" -ForegroundColor White
+Write-Host "Azure Firewall    : $(if ($DeployAzureFirewall) { 'Yes' } else { 'No' })" -ForegroundColor White
+Write-Host ""
+
+$confirm = Read-Host "Proceed with deployment? (y/n)"
+if ($confirm -ne 'y' -and $confirm -ne 'Y') {
+    Write-Host "Deployment cancelled." -ForegroundColor Yellow
+    exit 0
+}
+
+# Check Azure Login
+Write-Step "Checking Azure CLI authentication..."
+$account = az account show 2>&1
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "Not logged in. Running az login..." -ForegroundColor Yellow
+    az login --scope https://management.azure.com/.default
+}
+
+# Create Resource Group
+Write-Step "Creating resource group: $ResourceGroupName"
+az group create --name $ResourceGroupName --location $Location --output none
+
+# Deploy Bicep Template
+Write-Step "Deploying Bicep template..."
+Write-Info "This may take 10-15 minutes (longer with Azure Firewall)"
+
+$deployParams = @(
+    "--resource-group", $ResourceGroupName,
+    "--template-file", "$PSScriptRoot\main.bicep",
+    "--parameters", "deploymentPrefix=$DeploymentPrefix",
+    "--parameters", "adminUsername=$AdminUsername",
+    "--parameters", "adminPassword=$AdminPassword",
+    "--parameters", "location=$Location",
+    "--parameters", "deployAzureFirewall=$($DeployAzureFirewall.ToString().ToLower())"
+)
+
+az deployment group create @deployParams
+
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "Deployment failed!" -ForegroundColor Red
+    exit 1
+}
+
+$endTime = Get-Date
+$duration = $endTime - $startTime
+
+Write-Header "Deployment Completed Successfully!"
+Write-Host "Duration: $($duration.Minutes) minutes $($duration.Seconds) seconds" -ForegroundColor Green
+
+# Show Post-Deployment Instructions
+Show-PostDeploymentInstructions -ResourceGroup $ResourceGroupName -DeploymentPrefix $DeploymentPrefix -WithFirewall:$DeployAzureFirewall
+
+Write-Host ""
+Write-Host "Deployment completed successfully!" -ForegroundColor Green

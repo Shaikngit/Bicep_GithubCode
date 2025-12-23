@@ -1,256 +1,209 @@
-# 🛡️ Private Endpoint Policies Lab
+# PE Policies Lab - Private Endpoint Network Policies with Optional Azure Firewall
 
-[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FAzure%2Fazure-quickstart-templates%2Fmaster%2Fquickstarts%2Fmicrosoft.network%2Fprivate-endpoint%2Fazuredeploy.json)
+This lab demonstrates **Private Endpoint Network Policies** behavior with an IIS web server exposed via Private Link Service.
 
-## 🎯 Overview
+## 🎯 Learning Objectives
 
-This Bicep template creates a comprehensive lab environment demonstrating Private Endpoint policies with Azure Firewall, SQL Server with Private Endpoint, and client VM connectivity. This architecture showcases network security policies, private connectivity patterns, and firewall integration.
+- Understand `privateEndpointNetworkPolicies` setting
+- Apply NSG rules to Private Endpoint traffic
+- Configure Private Link Service with Internal Load Balancer
+- Optionally route PE traffic through Azure Firewall
 
-## 🏛️ Architecture
+## 📐 Architecture
+
+### Without Azure Firewall (Default)
 
 ```
-    Internet
-        │
-        ▼
-    ┌─────────────────────────────────────────────────────────────┐
-    │                 Hub Network                               │
-    │              (172.16.0.0/16)                             │
-    │                                                           │
-    │  ┌─────────────────┐         ┌─────────────────────────┐  │
-    │  │ Firewall Subnet │         │    Management Subnet    │  │
-    │  │  (172.16.1.0/24)│         │     (172.16.2.0/24)    │  │
-    │  │                 │         │                         │  │
-    │  │ ┌─────────────┐ │         │  ┌────────────────────┐ │  │
-    │  │ │Azure        │ │         │  │    Client VM       │ │  │
-    │  │ │Firewall     │ │◄────────┼──┤  (Test Client)     │ │  │
-    │  │ └─────────────┘ │         │  └────────────────────┘ │  │
-    │  └─────────────────┘         └─────────────────────────┘  │
-    └─────────────────────────────────────────────────────────────┘
-                │
-                ▼ (Filtered Traffic)
-    ┌─────────────────────────────────────────────────────────────┐
-    │                Spoke Network                              │
-    │              (10.0.0.0/16)                               │
-    │                                                           │
-    │  ┌─────────────────────────────────────────────────────────┐  │
-    │  │              Data Subnet                            │  │
-    │  │            (10.0.1.0/24)                           │  │
-    │  │                                                     │  │
-    │  │  ┌─────────────┐        ┌─────────────────────────┐ │  │
-    │  │  │Private      │        │     SQL Server         │ │  │
-    │  │  │Endpoint     │◄───────┤   (Private Access)     │ │  │
-    │  │  └─────────────┘        └─────────────────────────┘ │  │
-    │  └─────────────────────────────────────────────────────────┘  │
-    └─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│                       CLIENT VNET (10.10.0.0/16)                        │
+│  ┌──────────────┐                                                       │
+│  │  Client VM   │────────────────────────────────┐                      │
+│  │  (Windows)   │                                │                      │
+│  └──────────────┘                                │                      │
+│                                                  ▼                      │
+│  ┌─────────────────────────────────────────────────────────────────┐    │
+│  │  pe-subnet [NSG + PE Network Policies Enabled]                  │    │
+│  │  ┌───────────────────┐                                          │    │
+│  │  │  Private Endpoint │──────────────────────┐                   │    │
+│  │  └───────────────────┘                      │                   │    │
+│  └─────────────────────────────────────────────┼───────────────────┘    │
+│                                                │                        │
+│  ┌─────────────────┐                           │ Private Link           │
+│  │  Azure Bastion  │                           │                        │
+│  └─────────────────┘                           │                        │
+└────────────────────────────────────────────────┼────────────────────────┘
+                                                 │
+═══════════════════════════════════════════════════════════════════════════
+                                                 │
+┌────────────────────────────────────────────────┼────────────────────────┐
+│                       SERVICE VNET (10.20.0.0/16)                       │
+│  ┌─────────────────────────────────────────────┼───────────────────┐    │
+│  │  pls-subnet                                 │                   │    │
+│  │  ┌────────────────────────┐                 │                   │    │
+│  │  │  Private Link Service  │◄────────────────┘                   │    │
+│  │  └───────────┬────────────┘                                     │    │
+│  └──────────────┼──────────────────────────────────────────────────┘    │
+│                 │                                                       │
+│  ┌──────────────▼──────────────────────────────────────────────────┐    │
+│  │  web-subnet                                                     │    │
+│  │  ┌───────────────────┐      ┌────────────────────────────────┐  │    │
+│  │  │  Internal LB      │──────│  IIS Web Server VM             │  │    │
+│  │  └───────────────────┘      └────────────────────────────────┘  │    │
+│  └─────────────────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
-## 📋 Features
+### With Azure Firewall
 
-- **Azure Firewall**: Network security and traffic filtering
-- **Private Endpoint**: Secure SQL Server connectivity
-- **SQL Server Database**: Managed database with private access
-- **Client VM**: Windows test machine for connectivity validation
-- **Hub-Spoke Topology**: Centralized security and routing
-- **Network Policies**: Comprehensive security rule sets
-- **Private DNS Integration**: Automatic DNS resolution
-- **Modular Design**: Separate modules for each component
-
-## 🔧 Parameters
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| location | string | resourceGroup().location | Azure region for deployment |
-| adminpassword | securestring | - | Administrator password for VMs and SQL |
-| adminusername | string | - | Administrator username |
-| allowedRdpSourceAddress | string | - | Source IP/CIDR for RDP access |
-| vmSizeOption | string | Non-Overlake | VM size option (Overlake/Non-Overlake) |
-| useCustomImage | string | No | Use custom VM image (Yes/No) |
-
-## 🚀 Quick Deploy
-
-### Azure CLI
-```bash
-# Create resource group
-az group create --name rg-pe-policies --location southeastasia
-
-# Deploy template
-az deployment group create \
-  --resource-group rg-pe-policies \
-  --template-file main.bicep \
-  --parameters adminusername="azureuser" \
-               adminpassword="SecureP@ssw0rd123!" \
-               allowedRdpSourceAddress="0.0.0.0/0"
+```
+Client VM → Route Table → Azure Firewall → Private Endpoint → PLS → ILB → IIS
 ```
 
-### PowerShell
-```powershell
-# Create resource group
-New-AzResourceGroup -Name "rg-pe-policies" -Location "East US"
+When Azure Firewall is deployed:
+- VNet peering connects Client VNet to Service VNet
+- Route Table forces PE subnet traffic through Azure Firewall
+- Firewall network rules allow HTTP/HTTPS traffic
 
-# Deploy template
-New-AzResourceGroupDeployment `
-  -ResourceGroupName "rg-pe-policies" `
-  -TemplateFile "main.bicep" `
-  -adminusername "azureuser" `
-  -adminpassword (ConvertTo-SecureString "SecureP@ssw0rd123!" -AsPlainText -Force) `
-  -allowedRdpSourceAddress "0.0.0.0/0"
-```
+## 🔑 Key Concepts
 
-## 🧪 Testing & Validation
+### Private Endpoint Network Policies
 
-### 1. Connect to Client VM
-```bash
-# RDP to client VM through Azure Firewall
-# Navigate to Azure Portal > Virtual Machines > ClientVM > Connect
-```
+The `privateEndpointNetworkPolicies` subnet property controls whether NSG and UDR rules apply to Private Endpoint traffic:
 
-### 2. Test Private Endpoint Connectivity
-```powershell
-# From Client VM, test SQL Server connectivity
-$serverName = "<sql-server-name>.database.windows.net"
-Test-NetConnection -ComputerName $serverName -Port 1433
+| Setting | NSG on PE Traffic | UDR on PE Traffic |
+|---------|-------------------|-------------------|
+| `Disabled` (default) | ❌ No | ❌ No |
+| `Enabled` | ✅ Yes | ✅ Yes |
 
-# Test DNS resolution (should resolve to private IP)
-nslookup $serverName
-```
+In this lab, we set `privateEndpointNetworkPolicies: 'Enabled'` on the PE subnet, which allows:
+- NSG rules to filter traffic to the Private Endpoint
+- Route Tables to redirect PE traffic through Azure Firewall
 
-### 3. Validate Firewall Policies
-```bash
-# Check Azure Firewall logs
-# Navigate to Azure Portal > Firewall > Logs
-# Review allowed/denied connections
-```
+### Private Link Service
 
-## 🔒 Security Features
+Private Link Service exposes an Internal Load Balancer to consumers via Private Endpoint:
+- Provider creates PLS attached to ILB frontend
+- Consumer creates PE in their VNet
+- Traffic flows: PE → PLS → ILB → Backend VMs
 
-- ✅ Azure Firewall for network traffic filtering
-- ✅ Private Endpoint eliminates public SQL access
-- ✅ Hub-spoke network topology for centralized security
-- ✅ Network Security Groups for subnet-level protection
-- ✅ Private DNS zones for secure name resolution
-- ✅ SQL Server firewall rules for additional protection
-- ✅ VNet integration for all components
+## 🚀 Deployment
 
-## 🏷️ Resource Tags
+### Prerequisites
 
-All resources are tagged with:
-- Project: Private-Endpoint-Policies
-- Environment: Lab
-- Architecture: Hub-Spoke-Firewall
-
-## 💰 Cost Optimization
-
-- **Azure Firewall**: ~$1.25/hour + data processing
-- **SQL Database**: Variable based on compute and storage tier
-- **Private Endpoint**: ~$7.30/month
-- **Virtual Machines**: Variable based on size selection
-- **VNet**: No additional charges
-
-## 📊 Monitoring
-
-Monitor your lab environment:
-- Azure Firewall application and network rules
-- SQL Database performance and connections
-- Private Endpoint connection health
-- VM performance metrics
-- Network Security Group flow logs
-
-## 🔧 Customization
-
-### Firewall Rules
-- Configure additional application rules
-- Set up network rules for specific protocols
-- Implement threat intelligence filtering
-
-### SQL Database Configuration
-- Configure different performance tiers
-- Set up backup and retention policies
-- Implement advanced security features
-
-### Network Topology
-- Add additional spoke networks
-- Implement ExpressRoute connectivity
-- Configure site-to-site VPN
-
-## 🚨 Troubleshooting
-
-### Firewall Connectivity Issues
-```bash
-# Check firewall rules
-az network firewall application-rule list --firewall-name <firewall-name> --resource-group <rg>
-
-# Review firewall logs
-# Navigate to Azure Portal > Firewall > Logs
-```
-
-### SQL Connectivity Problems
-```powershell
-# Test SQL Server connectivity
-Test-NetConnection -ComputerName <sql-server-name>.database.windows.net -Port 1433
-
-# Check private endpoint status
-Get-AzPrivateEndpointConnection
-```
-
-## 📚 Related Resources
-
-- [Azure Firewall Documentation](https://docs.microsoft.com/azure/firewall/)
-- [Private Endpoint Documentation](https://docs.microsoft.com/azure/private-link/private-endpoint-overview)
-- [Azure SQL Database Documentation](https://docs.microsoft.com/azure/azure-sql/database/)
-- [Hub-Spoke Network Topology](https://docs.microsoft.com/azure/architecture/reference-architectures/hybrid-networking/hub-spoke)
-
----
-
-*This lab environment demonstrates enterprise network security patterns with private connectivity and centralized policy enforcement.*
-Azure Private DNS Link
-
-This deployment script creates three VNETs - one for the client VM, one for the SQL Server VM, and one for the private endpoint.
-
-when the deployment is completed, you can connect to the client VM and try to connect to the SQL Server VM using the private IP address. You can also try to connect to the SQL Server VM using the private endpoint.
-
-## File Structure
-
-- `main.bicep`: The main Bicep script that defines the infrastructure.
-
-## Prerequisites
-
-- VS Code installed
 - Azure CLI installed
-- Bicep Extension installed in VS Code
+- PowerShell 7.0+
+- Azure subscription with Contributor access
 
-## Deployment
+### Deploy Without Firewall (Default)
 
-To deploy the resources defined in the `main.bicep` file, use the following command:
-
-```Terminal
-
-az group create --name <resourcegroupname> --location <location>
-
-az deployment group create --resource-group <resourcegroupname> --template-file main.bicep 
-
-```
-To deploy the VM resources in the `main.bicep` with custom image use the following command:
-
-```Terminal 
-
-az deployment group create --resource-group <resourcegroupname> --template-file main.bicep --parameters useCustomImage=Yes 
-
+```powershell
+cd PE_Policies_Lab
+.\deploy.ps1
 ```
 
-## Input 
+### Deploy With Azure Firewall
 
-- Admin Username
-- Admin Password
-- Public IP Address of your machine to allow RDP
-
-## Output
-
-- None
-
-## Clean up deployment
-
-To remove the resources that were created as part of this deployment, use the following command:
-
-```Terminal
-az group delete --name <resourcegroupname> --yes --no-wait
+```powershell
+cd PE_Policies_Lab
+.\deploy.ps1 -DeployAzureFirewall
 ```
+
+### Custom Parameters
+
+```powershell
+.\deploy.ps1 -ResourceGroupName "my-pe-lab" `
+             -Location "eastus" `
+             -DeploymentPrefix "mylab" `
+             -DeployAzureFirewall
+```
+
+### Cleanup
+
+```powershell
+.\deploy.ps1 -Cleanup
+```
+
+## 🧪 Testing
+
+After deployment, the script displays test instructions. Here's a summary:
+
+### Step 1: Connect to Client VM
+
+1. Go to Azure Portal → Resource Group
+2. Select `pelab-client-vm`
+3. Click **Connect** → **Bastion**
+4. Login with credentials (default: `azureuser` / your password)
+
+### Step 2: Test Connectivity
+
+From Client VM PowerShell:
+
+```powershell
+# Get PE IP from deployment output, e.g., 10.10.1.4
+
+# Test TCP connectivity
+Test-NetConnection -ComputerName <PE_IP> -Port 80
+
+# Test HTTP request
+Invoke-WebRequest -Uri http://<PE_IP> -UseBasicParsing
+
+# View webpage content
+(Invoke-WebRequest -Uri http://<PE_IP> -UseBasicParsing).Content
+```
+
+### Expected Results
+
+- ✅ `TcpTestSucceeded: True`
+- ✅ `StatusCode: 200`
+- ✅ HTML content showing "Success! You have reached the IIS Web Server via Private Endpoint"
+
+### Step 3: Verify PE Network Policies
+
+1. Go to Client VNet → Subnets → pe-subnet
+2. Verify **Private endpoint network policies** is `Enabled`
+3. Check NSG `pelab-pe-nsg` is attached
+4. Review NSG rules:
+   - `AllowHTTPInbound` - Allows HTTP from Client VM subnet
+   - `DenyAllOtherInbound` - Denies all other traffic
+
+## 📁 Files
+
+| File | Description |
+|------|-------------|
+| `main.bicep` | Main Bicep template with all resources |
+| `deploy.ps1` | Deployment script with architecture diagram |
+| `cleanup.ps1` | Cleanup script |
+| `validate.ps1` | Validation script |
+
+## 📊 Resources Deployed
+
+| Resource | Name | Purpose |
+|----------|------|---------|
+| Resource Group | rg-pe-policies-lab | Container for all resources |
+| Client VNet | pelab-client-vnet | Client network (10.10.0.0/16) |
+| Service VNet | pelab-service-vnet | Service network (10.20.0.0/16) |
+| Client VM | pelab-client-vm | Test machine |
+| Web Server VM | pelab-web-vm | IIS web server |
+| Bastion | pelab-bastion | Secure VM access |
+| Internal LB | pelab-ilb | Load balancer for web server |
+| Private Link Service | pelab-pls | Exposes ILB via Private Link |
+| Private Endpoint | pelab-pe | Consumer endpoint in client VNet |
+| NSG | pelab-pe-nsg | NSG on PE subnet |
+| Azure Firewall | pelab-fw | (Optional) Traffic inspection |
+| Route Table | pelab-rt-pe-subnet | (Optional) Routes PE traffic via firewall |
+
+## 💡 Key Takeaways
+
+1. **PE Network Policies Enable NSG/UDR**: By default, NSG and UDR are ignored for PE traffic. Enable `privateEndpointNetworkPolicies` to apply them.
+
+2. **Private Link Service Architecture**: PLS connects to ILB frontend, allowing consumers to access backend services via PE without VNet peering.
+
+3. **Optional Firewall Routing**: When security requirements demand traffic inspection, Azure Firewall + Route Table can inspect PE traffic.
+
+4. **No VNet Peering Without Firewall**: Private Link works without VNet peering. Peering is only needed when routing through a firewall.
+
+## 🔗 References
+
+- [Private Endpoint Network Policies](https://learn.microsoft.com/en-us/azure/private-link/disable-private-endpoint-network-policy)
+- [Private Link Service Overview](https://learn.microsoft.com/en-us/azure/private-link/private-link-service-overview)
+- [Azure Firewall with Private Link](https://learn.microsoft.com/en-us/azure/firewall/integrate-with-private-link)
