@@ -1,0 +1,329 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.39.26.7824",
+      "templateHash": "6033685755613810413"
+    }
+  },
+  "parameters": {
+    "adminUsername": {
+      "type": "string",
+      "metadata": {
+        "description": "The username for the virtual machine administrator."
+      }
+    },
+    "adminPassword": {
+      "type": "securestring",
+      "metadata": {
+        "description": "The password for the virtual machine administrator."
+      }
+    },
+    "location": {
+      "type": "string",
+      "defaultValue": "southeastasia",
+      "metadata": {
+        "description": "The location for all resources."
+      }
+    },
+    "vmSize": {
+      "type": "string",
+      "defaultValue": "Standard_D8s_v3",
+      "metadata": {
+        "description": "VM Size - D8s_v3 supports accelerated networking required for DPDK"
+      }
+    },
+    "vmNamePrefix": {
+      "type": "string",
+      "defaultValue": "dpdkvm",
+      "metadata": {
+        "description": "Name prefix for the VMs"
+      }
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Network/virtualNetworks",
+      "apiVersion": "2023-09-01",
+      "name": "dpdk-vnet",
+      "location": "[parameters('location')]",
+      "properties": {
+        "addressSpace": {
+          "addressPrefixes": [
+            "10.0.0.0/16"
+          ]
+        },
+        "subnets": [
+          {
+            "name": "dpdk-subnet",
+            "properties": {
+              "addressPrefix": "10.0.1.0/24"
+            }
+          },
+          {
+            "name": "AzureBastionSubnet",
+            "properties": {
+              "addressPrefix": "10.0.2.0/26"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "apiVersion": "2023-09-01",
+      "name": "dpdk-nsg",
+      "location": "[parameters('location')]",
+      "properties": {
+        "securityRules": [
+          {
+            "name": "AllowAllInbound",
+            "properties": {
+              "priority": 100,
+              "direction": "Inbound",
+              "access": "Allow",
+              "protocol": "*",
+              "sourceAddressPrefix": "VirtualNetwork",
+              "sourcePortRange": "*",
+              "destinationAddressPrefix": "VirtualNetwork",
+              "destinationPortRange": "*"
+            }
+          },
+          {
+            "name": "AllowAllOutbound",
+            "properties": {
+              "priority": 100,
+              "direction": "Outbound",
+              "access": "Allow",
+              "protocol": "*",
+              "sourceAddressPrefix": "VirtualNetwork",
+              "sourcePortRange": "*",
+              "destinationAddressPrefix": "VirtualNetwork",
+              "destinationPortRange": "*"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Network/publicIPAddresses",
+      "apiVersion": "2023-09-01",
+      "name": "bastion-pip",
+      "location": "[parameters('location')]",
+      "sku": {
+        "name": "Standard"
+      },
+      "properties": {
+        "publicIPAllocationMethod": "Static"
+      }
+    },
+    {
+      "type": "Microsoft.Network/bastionHosts",
+      "apiVersion": "2023-09-01",
+      "name": "dpdk-bastion",
+      "location": "[parameters('location')]",
+      "sku": {
+        "name": "Basic"
+      },
+      "properties": {
+        "ipConfigurations": [
+          {
+            "name": "bastionIpConfig",
+            "properties": {
+              "subnet": {
+                "id": "[reference(resourceId('Microsoft.Network/virtualNetworks', 'dpdk-vnet'), '2023-09-01').subnets[1].id]"
+              },
+              "publicIPAddress": {
+                "id": "[resourceId('Microsoft.Network/publicIPAddresses', 'bastion-pip')]"
+              }
+            }
+          }
+        ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/publicIPAddresses', 'bastion-pip')]",
+        "[resourceId('Microsoft.Network/virtualNetworks', 'dpdk-vnet')]"
+      ]
+    },
+    {
+      "type": "Microsoft.Network/networkInterfaces",
+      "apiVersion": "2023-09-01",
+      "name": "[format('{0}1-nic', parameters('vmNamePrefix'))]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "ipConfigurations": [
+          {
+            "name": "ipconfig1",
+            "properties": {
+              "subnet": {
+                "id": "[reference(resourceId('Microsoft.Network/virtualNetworks', 'dpdk-vnet'), '2023-09-01').subnets[0].id]"
+              },
+              "privateIPAllocationMethod": "Static",
+              "privateIPAddress": "10.0.1.10"
+            }
+          }
+        ],
+        "enableAcceleratedNetworking": true,
+        "networkSecurityGroup": {
+          "id": "[resourceId('Microsoft.Network/networkSecurityGroups', 'dpdk-nsg')]"
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/networkSecurityGroups', 'dpdk-nsg')]",
+        "[resourceId('Microsoft.Network/virtualNetworks', 'dpdk-vnet')]"
+      ]
+    },
+    {
+      "type": "Microsoft.Network/networkInterfaces",
+      "apiVersion": "2023-09-01",
+      "name": "[format('{0}2-nic', parameters('vmNamePrefix'))]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "ipConfigurations": [
+          {
+            "name": "ipconfig1",
+            "properties": {
+              "subnet": {
+                "id": "[reference(resourceId('Microsoft.Network/virtualNetworks', 'dpdk-vnet'), '2023-09-01').subnets[0].id]"
+              },
+              "privateIPAllocationMethod": "Static",
+              "privateIPAddress": "10.0.1.11"
+            }
+          }
+        ],
+        "enableAcceleratedNetworking": true,
+        "networkSecurityGroup": {
+          "id": "[resourceId('Microsoft.Network/networkSecurityGroups', 'dpdk-nsg')]"
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/networkSecurityGroups', 'dpdk-nsg')]",
+        "[resourceId('Microsoft.Network/virtualNetworks', 'dpdk-vnet')]"
+      ]
+    },
+    {
+      "type": "Microsoft.Compute/virtualMachines",
+      "apiVersion": "2023-09-01",
+      "name": "[format('{0}1', parameters('vmNamePrefix'))]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "hardwareProfile": {
+          "vmSize": "[parameters('vmSize')]"
+        },
+        "osProfile": {
+          "computerName": "[format('{0}1', parameters('vmNamePrefix'))]",
+          "adminUsername": "[parameters('adminUsername')]",
+          "adminPassword": "[parameters('adminPassword')]",
+          "linuxConfiguration": {
+            "disablePasswordAuthentication": false
+          }
+        },
+        "storageProfile": {
+          "imageReference": {
+            "publisher": "Canonical",
+            "offer": "0001-com-ubuntu-server-jammy",
+            "sku": "22_04-lts-gen2",
+            "version": "latest"
+          },
+          "osDisk": {
+            "name": "[format('{0}1-osdisk', parameters('vmNamePrefix'))]",
+            "createOption": "FromImage",
+            "managedDisk": {
+              "storageAccountType": "Premium_LRS"
+            }
+          }
+        },
+        "networkProfile": {
+          "networkInterfaces": [
+            {
+              "id": "[resourceId('Microsoft.Network/networkInterfaces', format('{0}1-nic', parameters('vmNamePrefix')))]"
+            }
+          ]
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/networkInterfaces', format('{0}1-nic', parameters('vmNamePrefix')))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Compute/virtualMachines",
+      "apiVersion": "2023-09-01",
+      "name": "[format('{0}2', parameters('vmNamePrefix'))]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "hardwareProfile": {
+          "vmSize": "[parameters('vmSize')]"
+        },
+        "osProfile": {
+          "computerName": "[format('{0}2', parameters('vmNamePrefix'))]",
+          "adminUsername": "[parameters('adminUsername')]",
+          "adminPassword": "[parameters('adminPassword')]",
+          "linuxConfiguration": {
+            "disablePasswordAuthentication": false
+          }
+        },
+        "storageProfile": {
+          "imageReference": {
+            "publisher": "Canonical",
+            "offer": "0001-com-ubuntu-server-jammy",
+            "sku": "22_04-lts-gen2",
+            "version": "latest"
+          },
+          "osDisk": {
+            "name": "[format('{0}2-osdisk', parameters('vmNamePrefix'))]",
+            "createOption": "FromImage",
+            "managedDisk": {
+              "storageAccountType": "Premium_LRS"
+            }
+          }
+        },
+        "networkProfile": {
+          "networkInterfaces": [
+            {
+              "id": "[resourceId('Microsoft.Network/networkInterfaces', format('{0}2-nic', parameters('vmNamePrefix')))]"
+            }
+          ]
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/networkInterfaces', format('{0}2-nic', parameters('vmNamePrefix')))]"
+      ]
+    }
+  ],
+  "outputs": {
+    "vm1Name": {
+      "type": "string",
+      "value": "[format('{0}1', parameters('vmNamePrefix'))]"
+    },
+    "vm1PrivateIP": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.Network/networkInterfaces', format('{0}1-nic', parameters('vmNamePrefix'))), '2023-09-01').ipConfigurations[0].properties.privateIPAddress]"
+    },
+    "vm2Name": {
+      "type": "string",
+      "value": "[format('{0}2', parameters('vmNamePrefix'))]"
+    },
+    "vm2PrivateIP": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.Network/networkInterfaces', format('{0}2-nic', parameters('vmNamePrefix'))), '2023-09-01').ipConfigurations[0].properties.privateIPAddress]"
+    },
+    "bastionName": {
+      "type": "string",
+      "value": "dpdk-bastion"
+    },
+    "vnetName": {
+      "type": "string",
+      "value": "dpdk-vnet"
+    },
+    "subnetName": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.Network/virtualNetworks', 'dpdk-vnet'), '2023-09-01').subnets[0].name]"
+    },
+    "acceleratedNetworkingEnabled": {
+      "type": "bool",
+      "value": "[reference(resourceId('Microsoft.Network/networkInterfaces', format('{0}1-nic', parameters('vmNamePrefix'))), '2023-09-01').enableAcceleratedNetworking]"
+    }
+  }
+}
