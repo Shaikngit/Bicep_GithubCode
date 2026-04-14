@@ -1,0 +1,5 @@
+# Credentials and local config
+.env
+
+# Compiled ARM templates
+**/main.json
