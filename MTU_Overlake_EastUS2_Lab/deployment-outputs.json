@@ -1,0 +1,344 @@
+{
+  "id": "/subscriptions/58400668-ed03-47a3-a7f8-fb03677bdffb/resourceGroups/rg-mtu-lab-eastus2/providers/Microsoft.Resources/deployments/mtu-lab-20260527-104849",
+  "location": null,
+  "name": "mtu-lab-20260527-104849",
+  "properties": {
+    "correlationId": "9043c649-abb4-4e85-9200-b508299bf405",
+    "debugSetting": null,
+    "dependencies": [
+      {
+        "dependsOn": [
+          {
+            "id": "/subscriptions/58400668-ed03-47a3-a7f8-fb03677bdffb/resourceGroups/rg-mtu-lab-eastus2/providers/Microsoft.Network/networkSecurityGroups/nsg-mtu-lab",
+            "resourceGroup": "rg-mtu-lab-eastus2",
+            "resourceName": "nsg-mtu-lab",
+            "resourceType": "Microsoft.Network/networkSecurityGroups"
+          }
+        ],
+        "id": "/subscriptions/58400668-ed03-47a3-a7f8-fb03677bdffb/resourceGroups/rg-mtu-lab-eastus2/providers/Microsoft.Network/virtualNetworks/vnet-mtu-lab",
+        "resourceGroup": "rg-mtu-lab-eastus2",
+        "resourceName": "vnet-mtu-lab",
+        "resourceType": "Microsoft.Network/virtualNetworks"
+      },
+      {
+        "dependsOn": [
+          {
+            "id": "/subscriptions/58400668-ed03-47a3-a7f8-fb03677bdffb/resourceGroups/rg-mtu-lab-eastus2/providers/Microsoft.Network/publicIPAddresses/pip-mtu-src",
+            "resourceGroup": "rg-mtu-lab-eastus2",
+            "resourceName": "pip-mtu-src",
+            "resourceType": "Microsoft.Network/publicIPAddresses"
+          },
+          {
+            "id": "/subscriptions/58400668-ed03-47a3-a7f8-fb03677bdffb/resourceGroups/rg-mtu-lab-eastus2/providers/Microsoft.Network/virtualNetworks/vnet-mtu-lab",
+            "resourceGroup": "rg-mtu-lab-eastus2",
+            "resourceName": "vnet-mtu-lab",
+            "resourceType": "Microsoft.Network/virtualNetworks"
+          },
+          {
+            "apiVersion": "2023-09-01",
+            "id": "/subscriptions/58400668-ed03-47a3-a7f8-fb03677bdffb/resourceGroups/rg-mtu-lab-eastus2/providers/Microsoft.Network/virtualNetworks/vnet-mtu-lab",
+            "resourceGroup": "rg-mtu-lab-eastus2",
+            "resourceName": "vnet-mtu-lab",
+            "resourceType": "Microsoft.Network/virtualNetworks"
+          }
+        ],
+        "id": "/subscriptions/58400668-ed03-47a3-a7f8-fb03677bdffb/resourceGroups/rg-mtu-lab-eastus2/providers/Microsoft.Network/networkInterfaces/nic-mtu-src",
+        "resourceGroup": "rg-mtu-lab-eastus2",
+        "resourceName": "nic-mtu-src",
+        "resourceType": "Microsoft.Network/networkInterfaces"
+      },
+      {
+        "dependsOn": [
+          {
+            "id": "/subscriptions/58400668-ed03-47a3-a7f8-fb03677bdffb/resourceGroups/rg-mtu-lab-eastus2/providers/Microsoft.Network/virtualNetworks/vnet-mtu-lab",
+            "resourceGroup": "rg-mtu-lab-eastus2",
+            "resourceName": "vnet-mtu-lab",
+            "resourceType": "Microsoft.Network/virtualNetworks"
+          },
+          {
+            "apiVersion": "2023-09-01",
+            "id": "/subscriptions/58400668-ed03-47a3-a7f8-fb03677bdffb/resourceGroups/rg-mtu-lab-eastus2/providers/Microsoft.Network/virtualNetworks/vnet-mtu-lab",
+            "resourceGroup": "rg-mtu-lab-eastus2",
+            "resourceName": "vnet-mtu-lab",
+            "resourceType": "Microsoft.Network/virtualNetworks"
+          }
+        ],
+        "id": "/subscriptions/58400668-ed03-47a3-a7f8-fb03677bdffb/resourceGroups/rg-mtu-lab-eastus2/providers/Microsoft.Network/networkInterfaces/nic-mtu-dst",
+        "resourceGroup": "rg-mtu-lab-eastus2",
+        "resourceName": "nic-mtu-dst",
+        "resourceType": "Microsoft.Network/networkInterfaces"
+      },
+      {
+        "dependsOn": [
+          {
+            "id": "/subscriptions/58400668-ed03-47a3-a7f8-fb03677bdffb/resourceGroups/rg-mtu-lab-eastus2/providers/Microsoft.Network/networkInterfaces/nic-mtu-src",
+            "resourceGroup": "rg-mtu-lab-eastus2",
+            "resourceName": "nic-mtu-src",
+            "resourceType": "Microsoft.Network/networkInterfaces"
+          }
+        ],
+        "id": "/subscriptions/58400668-ed03-47a3-a7f8-fb03677bdffb/resourceGroups/rg-mtu-lab-eastus2/providers/Microsoft.Compute/virtualMachines/vm-mtu-src",
+        "resourceGroup": "rg-mtu-lab-eastus2",
+        "resourceName": "vm-mtu-src",
+        "resourceType": "Microsoft.Compute/virtualMachines"
+      },
+      {
+        "dependsOn": [
+          {
+            "id": "/subscriptions/58400668-ed03-47a3-a7f8-fb03677bdffb/resourceGroups/rg-mtu-lab-eastus2/providers/Microsoft.Network/networkInterfaces/nic-mtu-dst",
+            "resourceGroup": "rg-mtu-lab-eastus2",
+            "resourceName": "nic-mtu-dst",
+            "resourceType": "Microsoft.Network/networkInterfaces"
+          }
+        ],
+        "id": "/subscriptions/58400668-ed03-47a3-a7f8-fb03677bdffb/resourceGroups/rg-mtu-lab-eastus2/providers/Microsoft.Compute/virtualMachines/vm-mtu-dst",
+        "resourceGroup": "rg-mtu-lab-eastus2",
+        "resourceName": "vm-mtu-dst",
+        "resourceType": "Microsoft.Compute/virtualMachines"
+      }
+    ],
+    "diagnostics": null,
+    "duration": "PT38.8229602S",
+    "error": null,
+    "extensions": [],
+    "mode": "Incremental",
+    "onErrorDeployment": null,
+    "outputResources": [
+      {
+        "apiVersion": null,
+        "extension": null,
+        "id": "/subscriptions/58400668-ed03-47a3-a7f8-fb03677bdffb/resourceGroups/rg-mtu-lab-eastus2/providers/Microsoft.Compute/virtualMachines/vm-mtu-dst",
+        "identifiers": null,
+        "resourceGroup": "rg-mtu-lab-eastus2",
+        "resourceType": "Microsoft.Compute/virtualMachines"
+      },
+      {
+        "apiVersion": null,
+        "extension": null,
+        "id": "/subscriptions/58400668-ed03-47a3-a7f8-fb03677bdffb/resourceGroups/rg-mtu-lab-eastus2/providers/Microsoft.Compute/virtualMachines/vm-mtu-src",
+        "identifiers": null,
+        "resourceGroup": "rg-mtu-lab-eastus2",
+        "resourceType": "Microsoft.Compute/virtualMachines"
+      },
+      {
+        "apiVersion": null,
+        "extension": null,
+        "id": "/subscriptions/58400668-ed03-47a3-a7f8-fb03677bdffb/resourceGroups/rg-mtu-lab-eastus2/providers/Microsoft.Network/networkInterfaces/nic-mtu-dst",
+        "identifiers": null,
+        "resourceGroup": "rg-mtu-lab-eastus2",
+        "resourceType": "Microsoft.Network/networkInterfaces"
+      },
+      {
+        "apiVersion": null,
+        "extension": null,
+        "id": "/subscriptions/58400668-ed03-47a3-a7f8-fb03677bdffb/resourceGroups/rg-mtu-lab-eastus2/providers/Microsoft.Network/networkInterfaces/nic-mtu-src",
+        "identifiers": null,
+        "resourceGroup": "rg-mtu-lab-eastus2",
+        "resourceType": "Microsoft.Network/networkInterfaces"
+      },
+      {
+        "apiVersion": null,
+        "extension": null,
+        "id": "/subscriptions/58400668-ed03-47a3-a7f8-fb03677bdffb/resourceGroups/rg-mtu-lab-eastus2/providers/Microsoft.Network/networkSecurityGroups/nsg-mtu-lab",
+        "identifiers": null,
+        "resourceGroup": "rg-mtu-lab-eastus2",
+        "resourceType": "Microsoft.Network/networkSecurityGroups"
+      },
+      {
+        "apiVersion": null,
+        "extension": null,
+        "id": "/subscriptions/58400668-ed03-47a3-a7f8-fb03677bdffb/resourceGroups/rg-mtu-lab-eastus2/providers/Microsoft.Network/publicIPAddresses/pip-mtu-src",
+        "identifiers": null,
+        "resourceGroup": "rg-mtu-lab-eastus2",
+        "resourceType": "Microsoft.Network/publicIPAddresses"
+      },
+      {
+        "apiVersion": null,
+        "extension": null,
+        "id": "/subscriptions/58400668-ed03-47a3-a7f8-fb03677bdffb/resourceGroups/rg-mtu-lab-eastus2/providers/Microsoft.Network/virtualNetworks/vnet-mtu-lab",
+        "identifiers": null,
+        "resourceGroup": "rg-mtu-lab-eastus2",
+        "resourceType": "Microsoft.Network/virtualNetworks"
+      }
+    ],
+    "outputs": {
+      "destinationNicOutputName": {
+        "type": "String",
+        "value": "nic-mtu-dst"
+      },
+      "destinationVmPrivateIp": {
+        "type": "String",
+        "value": "10.235.1.4"
+      },
+      "sourceNicOutputName": {
+        "type": "String",
+        "value": "nic-mtu-src"
+      },
+      "sourceVmPrivateIp": {
+        "type": "String",
+        "value": "10.235.1.5"
+      },
+      "sourceVmPublicIp": {
+        "type": "String",
+        "value": "137.116.34.191"
+      }
+    },
+    "parameters": {
+      "adminPassword": {
+        "type": "SecureString"
+      },
+      "adminUsername": {
+        "type": "String",
+        "value": "azureuser"
+      },
+      "destinationNicName": {
+        "type": "String",
+        "value": "nic-mtu-dst"
+      },
+      "destinationVmName": {
+        "type": "String",
+        "value": "vm-mtu-dst"
+      },
+      "location": {
+        "type": "String",
+        "value": "eastus2"
+      },
+      "networkSecurityGroupName": {
+        "type": "String",
+        "value": "nsg-mtu-lab"
+      },
+      "sourceNicName": {
+        "type": "String",
+        "value": "nic-mtu-src"
+      },
+      "sourcePublicIpName": {
+        "type": "String",
+        "value": "pip-mtu-src"
+      },
+      "sourceVmName": {
+        "type": "String",
+        "value": "vm-mtu-src"
+      },
+      "subnetAddressPrefix": {
+        "type": "String",
+        "value": "10.235.1.0/24"
+      },
+      "subnetName": {
+        "type": "String",
+        "value": "subnet-lab"
+      },
+      "virtualNetworkName": {
+        "type": "String",
+        "value": "vnet-mtu-lab"
+      },
+      "vmSize": {
+        "type": "String",
+        "value": "Standard_D4s_v5"
+      },
+      "vnetAddressPrefix": {
+        "type": "String",
+        "value": "10.235.0.0/16"
+      }
+    },
+    "parametersLink": null,
+    "providers": [
+      {
+        "id": null,
+        "namespace": "Microsoft.Network",
+        "providerAuthorizationConsentState": null,
+        "registrationPolicy": null,
+        "registrationState": null,
+        "resourceTypes": [
+          {
+            "aliases": null,
+            "apiProfiles": null,
+            "apiVersions": null,
+            "capabilities": null,
+            "defaultApiVersion": null,
+            "locationMappings": null,
+            "locations": [
+              "eastus2"
+            ],
+            "properties": null,
+            "resourceType": "networkSecurityGroups",
+            "zoneMappings": null
+          },
+          {
+            "aliases": null,
+            "apiProfiles": null,
+            "apiVersions": null,
+            "capabilities": null,
+            "defaultApiVersion": null,
+            "locationMappings": null,
+            "locations": [
+              "eastus2"
+            ],
+            "properties": null,
+            "resourceType": "virtualNetworks",
+            "zoneMappings": null
+          },
+          {
+            "aliases": null,
+            "apiProfiles": null,
+            "apiVersions": null,
+            "capabilities": null,
+            "defaultApiVersion": null,
+            "locationMappings": null,
+            "locations": [
+              "eastus2"
+            ],
+            "properties": null,
+            "resourceType": "publicIPAddresses",
+            "zoneMappings": null
+          },
+          {
+            "aliases": null,
+            "apiProfiles": null,
+            "apiVersions": null,
+            "capabilities": null,
+            "defaultApiVersion": null,
+            "locationMappings": null,
+            "locations": [
+              "eastus2"
+            ],
+            "properties": null,
+            "resourceType": "networkInterfaces",
+            "zoneMappings": null
+          }
+        ]
+      },
+      {
+        "id": null,
+        "namespace": "Microsoft.Compute",
+        "providerAuthorizationConsentState": null,
+        "registrationPolicy": null,
+        "registrationState": null,
+        "resourceTypes": [
+          {
+            "aliases": null,
+            "apiProfiles": null,
+            "apiVersions": null,
+            "capabilities": null,
+            "defaultApiVersion": null,
+            "locationMappings": null,
+            "locations": [
+              "eastus2"
+            ],
+            "properties": null,
+            "resourceType": "virtualMachines",
+            "zoneMappings": null
+          }
+        ]
+      }
+    ],
+    "provisioningState": "Succeeded",
+    "templateHash": "1862909532369606531",
+    "templateLink": null,
+    "timestamp": "2026-05-27T05:19:51.114719+00:00",
+    "validatedResources": null,
+    "validationLevel": null
+  },
+  "resourceGroup": "rg-mtu-lab-eastus2",
+  "tags": null,
+  "type": "Microsoft.Resources/deployments"
+}

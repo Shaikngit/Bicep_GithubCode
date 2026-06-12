@@ -1,0 +1,97 @@
+CentOS MTU Lab Handoff
+Generated: 2026-05-29
+
+Subscription
+- Subscription ID: c18a2d54-fae6-4708-aa27-c0ad1ed4d172
+
+Login Credentials
+- Username: azuser
+- Password: MtuLab#May2026!Run
+
+Validated Test Command (used across labs)
+- Destination command: sudo pkill iperf3 || true; iperf3 -s
+- Source command: iperf3 -c <destination_private_ip> -u -b 2.5G -t 300
+- iperf version: iperf3 3.1.7
+
+====================================================================
+Lab 1: East US2 v4
+====================================================================
+- Resource Group: rg-mtu-centos-v4-eastus2
+- Region: eastus2
+- VM Size SKU: Standard_D2s_v4
+- Image: OpenLogic / CentOS / 7_9-gen2 / 7.9.2023030701
+
+Source VM
+- Name: vm-mtu-src
+- Resource ID: /subscriptions/c18a2d54-fae6-4708-aa27-c0ad1ed4d172/resourceGroups/rg-mtu-centos-v4-eastus2/providers/Microsoft.Compute/virtualMachines/vm-mtu-src
+- Public IP: 40.70.135.171
+- Private IP: 10.235.1.4
+
+Destination VM
+- Name: vm-mtu-dst
+- Resource ID: /subscriptions/c18a2d54-fae6-4708-aa27-c0ad1ed4d172/resourceGroups/rg-mtu-centos-v4-eastus2/providers/Microsoft.Compute/virtualMachines/vm-mtu-dst
+- Public IP: none
+- Private IP: 10.235.1.5
+
+SSH
+- Source: ssh -o StrictHostKeyChecking=accept-new azuser@40.70.135.171
+- Destination via jump: ssh -o StrictHostKeyChecking=accept-new -J azuser@40.70.135.171 azuser@10.235.1.5
+
+====================================================================
+Lab 2: East US2 v5
+====================================================================
+- Resource Group: rg-mtu-centos-v5-eastus2
+- Region: eastus2
+- VM Size SKU: Standard_D2s_v5
+- Image: OpenLogic / CentOS / 7_9-gen2 / 7.9.2023030701
+
+Source VM
+- Name: vm-mtu-src
+- Resource ID: /subscriptions/c18a2d54-fae6-4708-aa27-c0ad1ed4d172/resourceGroups/rg-mtu-centos-v5-eastus2/providers/Microsoft.Compute/virtualMachines/vm-mtu-src
+- Public IP: 20.246.13.230
+- Private IP: 10.235.1.4
+
+Destination VM
+- Name: vm-mtu-dst
+- Resource ID: /subscriptions/c18a2d54-fae6-4708-aa27-c0ad1ed4d172/resourceGroups/rg-mtu-centos-v5-eastus2/providers/Microsoft.Compute/virtualMachines/vm-mtu-dst
+- Public IP: none
+- Private IP: 10.235.1.5
+
+SSH
+- Source: ssh -o StrictHostKeyChecking=accept-new azuser@20.246.13.230
+- Destination via jump: ssh -o StrictHostKeyChecking=accept-new -J azuser@20.246.13.230 azuser@10.235.1.5
+
+====================================================================
+Lab 3: Central US v5
+====================================================================
+- Resource Group: rg-mtu-centos-v5-centralus
+- Region: centralus
+- VM Size SKU: Standard_D2s_v5
+- Image: OpenLogic / CentOS / 7_9-gen2 / latest
+
+Source VM
+- Name: vm-mtu-src
+- Resource ID: /subscriptions/c18a2d54-fae6-4708-aa27-c0ad1ed4d172/resourceGroups/rg-mtu-centos-v5-centralus/providers/Microsoft.Compute/virtualMachines/vm-mtu-src
+- Public IP: 74.249.165.209
+- Private IP: 10.235.1.5
+
+Destination VM
+- Name: vm-mtu-dst
+- Resource ID: /subscriptions/c18a2d54-fae6-4708-aa27-c0ad1ed4d172/resourceGroups/rg-mtu-centos-v5-centralus/providers/Microsoft.Compute/virtualMachines/vm-mtu-dst
+- Public IP: none
+- Private IP: 10.235.1.4
+
+SSH
+- Source: ssh -o StrictHostKeyChecking=accept-new azuser@74.249.165.209
+- Destination via jump: ssh -o StrictHostKeyChecking=accept-new -J azuser@74.249.165.209 azuser@10.235.1.4
+
+Host Key Fix Commands (if needed)
+- EastUS2 destination key refresh: ssh-keygen -R 10.235.1.5
+- CentralUS destination key refresh: ssh-keygen -R 10.235.1.4
+
+====================================================================
+Field Summary Statement
+====================================================================
+Based on one-direction UDP tests using the same iperf command and same iperf version,
+East US2 and Central US showed equivalent behavior for this profile, and East US2 v4 and v5
+showed almost the same results.

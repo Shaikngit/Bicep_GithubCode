@@ -1,0 +1,48 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "location": {
+      "value": "eastus2"
+    },
+    "adminUsername": {
+      "value": "azureuser"
+    },
+    "adminPassword": {
+      "value": "REPLACE_WITH_STRONG_PASSWORD"
+    },
+    "vmSize": {
+      "value": "Standard_D4s_v5"
+    },
+    "virtualNetworkName": {
+      "value": "vnet-mtu-lab"
+    },
+    "subnetName": {
+      "value": "subnet-lab"
+    },
+    "vnetAddressPrefix": {
+      "value": "10.235.0.0/16"
+    },
+    "subnetAddressPrefix": {
+      "value": "10.235.1.0/24"
+    },
+    "sourceVmName": {
+      "value": "vm-mtu-src"
+    },
+    "destinationVmName": {
+      "value": "vm-mtu-dst"
+    },
+    "networkSecurityGroupName": {
+      "value": "nsg-mtu-lab"
+    },
+    "sourceNicName": {
+      "value": "nic-mtu-src"
+    },
+    "destinationNicName": {
+      "value": "nic-mtu-dst"
+    },
+    "sourcePublicIpName": {
+      "value": "pip-mtu-src"
+    }
+  }
+}
