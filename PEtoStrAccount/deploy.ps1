@@ -33,10 +33,10 @@
     Preview deployment without making changes
 
 .EXAMPLE
-    .\deploy.ps1 -AdminPasswordOrKey "YourStrongPassword123!" -VmSizeOption "Non-Overlake" -ScriptFileUri "https://raw.githubusercontent.com/example/script.sh" -WorkspaceName "myworkspace"
+    .\deploy.ps1 -VmSizeOption "Non-Overlake" -ScriptFileUri "https://raw.githubusercontent.com/example/script.sh" -WorkspaceName "myworkspace"
 
 .EXAMPLE
-    .\deploy.ps1 -AdminPasswordOrKey "YourStrongPassword123!" -VmSizeOption "Overlake" -ScriptFileUri "https://example.com/script.sh" -WorkspaceName "testws" -WhatIf
+    .\deploy.ps1 -VmSizeOption "Overlake" -ScriptFileUri "https://example.com/script.sh" -WorkspaceName "testws" -WhatIf
 #>
 
 param(
@@ -46,8 +46,8 @@ param(
     [Parameter(Mandatory=$false)]
     [string]$Location = "southeastasia",
     
-    [Parameter(Mandatory=$true)]
-    [string]$AdminPasswordOrKey,
+    [Parameter(Mandatory=$false)]
+    [string]$AdminPasswordOrKey = "",
     
     [Parameter(Mandatory=$true)]
     [ValidateSet("Overlake", "Non-Overlake")]
@@ -68,6 +68,11 @@ param(
     [Parameter(Mandatory=$false)]
     [switch]$Force
 )
+
+if ([string]::IsNullOrWhiteSpace($AdminPasswordOrKey)) {
+    $secureAdminPassword = Read-Host "Enter admin password for VM deployment" -AsSecureString
+    $AdminPasswordOrKey = [System.Net.NetworkCredential]::new('', $secureAdminPassword).Password
+}
 
 # Helper functions
 function Write-ColorOutput {

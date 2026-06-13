@@ -39,10 +39,10 @@
     Skip confirmation prompts
 
 .EXAMPLE
-    .\deploy.ps1 -SqlAdministratorLogin "sqladmin" -SqlAdministratorLoginPassword "SqlPass123!" -VmAdminUsername "vmadmin" -VmAdminPassword "VmPass123!"
+    .\deploy.ps1 -SqlAdministratorLogin "sqladmin" -SqlAdministratorLoginPassword "SqlPass123!"
 
 .EXAMPLE
-    .\deploy.ps1 -SqlAdministratorLogin "sqladmin" -SqlAdministratorLoginPassword "SqlPass123!" -VmAdminUsername "vmadmin" -VmAdminPassword "VmPass123!" -WhatIf
+    .\deploy.ps1 -SqlAdministratorLogin "sqladmin" -SqlAdministratorLoginPassword "SqlPass123!" -WhatIf
 #>
 
 param(
@@ -58,11 +58,12 @@ param(
     [Parameter(Mandatory=$true)]
     [string]$SqlAdministratorLoginPassword,
     
-    [Parameter(Mandatory=$true)]
-    [string]$VmAdminUsername,
+    [Parameter(Mandatory=$false)]
+    [ValidateSet("azuser")]
+    [string]$VmAdminUsername = "azuser",
     
-    [Parameter(Mandatory=$true)]
-    [string]$VmAdminPassword,
+    [Parameter(Mandatory=$false)]
+    [string]$VmAdminPassword = "",
     
     [Parameter(Mandatory=$false)]
     [ValidateSet("Overlake", "Non-Overlake")]
@@ -77,6 +78,14 @@ param(
     [Parameter(Mandatory=$false)]
     [switch]$Force
 )
+
+# Enforce project VM username default
+$VmAdminUsername = "azuser"
+
+if ([string]::IsNullOrWhiteSpace($VmAdminPassword)) {
+    $secureVmPassword = Read-Host "Enter admin password for VM deployment" -AsSecureString
+    $VmAdminPassword = [System.Net.NetworkCredential]::new('', $secureVmPassword).Password
+}
 
 # =============================================================================
 # HELPER FUNCTIONS

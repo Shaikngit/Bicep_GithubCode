@@ -46,22 +46,31 @@
     Skip confirmation prompts
 
 .EXAMPLE
-    .\deploy.ps1 -AdminUsername "azureuser" -AdminPassword "YourP@ssword123!"
+    .\deploy.ps1
 
 .EXAMPLE
-    .\deploy.ps1 -AdminUsername "azureuser" -AdminPassword "YourP@ssword123!" -InstanceCount 3
+    .\deploy.ps1 -InstanceCount 3
 #>
 
 param(
     [Parameter(Mandatory=$false)]
     [string]$ResourceGroupName = "rg-vmss-crossregion",
     
-    [Parameter(Mandatory=$true)]
-    [string]$AdminUsername,
+    [Parameter(Mandatory=$false)]
+    [ValidateSet("azuser")]
+    [string]$AdminUsername = "azuser",
+
+    [Parameter(Mandatory=$false)]
+    [string]$AdminPassword = "",
     
-    [Parameter(Mandatory=$true)]
-    [string]$AdminPassword,
-    
+
+    # Enforce project VM username default
+    $AdminUsername = "azuser"
+
+    if ([string]::IsNullOrWhiteSpace($AdminPassword)) {
+        $secureAdminPassword = Read-Host "Enter admin password for VM deployment" -AsSecureString
+        $AdminPassword = [System.Net.NetworkCredential]::new('', $secureAdminPassword).Password
+    }
     [Parameter(Mandatory=$false)]
     [string]$ResourcePrefix = "vmss",
     

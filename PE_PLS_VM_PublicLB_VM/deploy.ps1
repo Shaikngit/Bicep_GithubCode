@@ -37,10 +37,10 @@
     Preview deployment without making changes
 
 .EXAMPLE
-    .\deploy.ps1 -VmAdminUsername "azureuser" -VmAdminPassword "YourStrongPassword123!" -VmSizeOption "Non-Overlake"
+    .\deploy.ps1 -VmSizeOption "Non-Overlake"
 
 .EXAMPLE
-    .\deploy.ps1 -VmAdminUsername "azureuser" -VmAdminPassword "YourStrongPassword123!" -VmSizeOption "Overlake" -WhatIf
+    .\deploy.ps1 -VmSizeOption "Overlake" -WhatIf
 #>
 
 param(
@@ -50,11 +50,12 @@ param(
     [Parameter(Mandatory=$false)]
     [string]$Location = "southeastasia",
     
-    [Parameter(Mandatory=$true)]
-    [string]$VmAdminUsername,
+    [Parameter(Mandatory=$false)]
+    [ValidateSet("azuser")]
+    [string]$VmAdminUsername = "azuser",
     
-    [Parameter(Mandatory=$true)]
-    [string]$VmAdminPassword,
+    [Parameter(Mandatory=$false)]
+    [string]$VmAdminPassword = "",
     
     [Parameter(Mandatory=$true)]
     [ValidateSet("Overlake", "Non-Overlake")]
@@ -76,6 +77,14 @@ param(
     [Parameter(Mandatory=$false)]
     [switch]$Force
 )
+
+# Enforce project VM username default
+$VmAdminUsername = "azuser"
+
+if ([string]::IsNullOrWhiteSpace($VmAdminPassword)) {
+    $secureVmPassword = Read-Host "Enter admin password for VM deployment" -AsSecureString
+    $VmAdminPassword = [System.Net.NetworkCredential]::new('', $secureVmPassword).Password
+}
 
 # Helper functions
 function Write-ColorOutput {

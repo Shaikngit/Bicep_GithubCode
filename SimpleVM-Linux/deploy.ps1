@@ -51,13 +51,13 @@
     Skip confirmation prompts
 
 .EXAMPLE
-    .\deploy.ps1 -AdminUsername "azureuser" -AdminPasswordOrKey "YourStrongPassword123!"
+    .\deploy.ps1
 
 .EXAMPLE
-    .\deploy.ps1 -AdminUsername "azureuser" -AdminPasswordOrKey "ssh-rsa AAAA..." -AuthenticationType "sshPublicKey"
+    .\deploy.ps1 -AdminPasswordOrKey "ssh-rsa AAAA..." -AuthenticationType "sshPublicKey"
 
 .EXAMPLE
-    .\deploy.ps1 -AdminUsername "azureuser" -AdminPasswordOrKey "YourStrongPassword123!" -WhatIf
+    .\deploy.ps1 -WhatIf
 #>
 
 param(
@@ -67,11 +67,12 @@ param(
     [Parameter(Mandatory=$false)]
     [string]$Location = "southeastasia",
     
-    [Parameter(Mandatory=$true)]
-    [string]$AdminUsername,
+    [Parameter(Mandatory=$false)]
+    [ValidateSet("azuser")]
+    [string]$AdminUsername = "azuser",
     
-    [Parameter(Mandatory=$true)]
-    [string]$AdminPasswordOrKey,
+    [Parameter(Mandatory=$false)]
+    [string]$AdminPasswordOrKey = "",
     
     [Parameter(Mandatory=$false)]
     [ValidateSet("sshPublicKey", "password")]
@@ -106,6 +107,14 @@ param(
     [Parameter(Mandatory=$false)]
     [switch]$Force
 )
+
+# Enforce project VM username default
+$AdminUsername = "azuser"
+
+if ($AuthenticationType -eq "password" -and [string]::IsNullOrWhiteSpace($AdminPasswordOrKey)) {
+    $secureAdminPassword = Read-Host "Enter admin password for VM deployment" -AsSecureString
+    $AdminPasswordOrKey = [System.Net.NetworkCredential]::new('', $secureAdminPassword).Password
+}
 
 # =============================================================================
 # HELPER FUNCTIONS

@@ -11,11 +11,12 @@ param(
     [Parameter(Mandatory = $false)]
     [string]$Location = "southeastasia",
 
-    [Parameter(Mandatory = $true)]
-    [string]$AdminUsername,
+    [Parameter(Mandatory = $false)]
+    [ValidateSet("azuser")]
+    [string]$AdminUsername = "azuser",
 
-    [Parameter(Mandatory = $true)]
-    [string]$AdminPassword,
+    [Parameter(Mandatory = $false)]
+    [string]$AdminPassword = "",
 
     [Parameter(Mandatory = $false)]
     [string]$VmSize = "Standard_B2s",
@@ -26,6 +27,14 @@ param(
     [Parameter(Mandatory = $false)]
     [switch]$Force
 )
+
+# Enforce project VM username default
+$AdminUsername = "azuser"
+
+if ([string]::IsNullOrWhiteSpace($AdminPassword)) {
+    $secureAdminPassword = Read-Host "Enter admin password for VM deployment" -AsSecureString
+    $AdminPassword = [System.Net.NetworkCredential]::new('', $secureAdminPassword).Password
+}
 
 # ============================================================================
 # Functions

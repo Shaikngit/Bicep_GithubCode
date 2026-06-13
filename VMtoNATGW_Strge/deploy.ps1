@@ -36,7 +36,7 @@
     Preview deployment without making changes
 
 .EXAMPLE
-    .\deploy.ps1 -AdminPassword "YourStrongPassword123!" -AdminUsername "azureuser" -AllowedRdpSourceAddress "203.0.113.0/24" -VmSizeOption "Non-Overlake"
+    .\deploy.ps1 -AllowedRdpSourceAddress "203.0.113.0/24" -VmSizeOption "Non-Overlake"
 #>
 
 param(
@@ -46,11 +46,12 @@ param(
     [Parameter(Mandatory=$false)]
     [string]$Location = "southeastasia",
     
-    [Parameter(Mandatory=$true)]
-    [string]$AdminPassword,
+    [Parameter(Mandatory=$false)]
+    [string]$AdminPassword = "",
     
-    [Parameter(Mandatory=$true)]
-    [string]$AdminUsername,
+    [Parameter(Mandatory=$false)]
+    [ValidateSet("azuser")]
+    [string]$AdminUsername = "azuser",
     
     [Parameter(Mandatory=$true)]
     [string]$AllowedRdpSourceAddress,
@@ -72,6 +73,14 @@ param(
     [Parameter(Mandatory=$false)]
     [switch]$Force
 )
+
+# Enforce project VM username default
+$AdminUsername = "azuser"
+
+if ([string]::IsNullOrWhiteSpace($AdminPassword)) {
+    $secureAdminPassword = Read-Host "Enter admin password for VM deployment" -AsSecureString
+    $AdminPassword = [System.Net.NetworkCredential]::new('', $secureAdminPassword).Password
+}
 
 # Helper functions
 function Write-ColorOutput {

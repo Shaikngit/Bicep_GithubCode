@@ -33,10 +33,10 @@
     Skip confirmation prompts
 
 .EXAMPLE
-    .\deploy.ps1 -AdminUsername "azureuser" -AdminPassword "YourStrongPassword123!"
+    .\deploy.ps1
 
 .EXAMPLE
-    .\deploy.ps1 -AdminUsername "azureuser" -AdminPassword "YourStrongPassword123!" -WhatIf
+    .\deploy.ps1 -WhatIf
 #>
 
 param(
@@ -46,11 +46,12 @@ param(
     [Parameter(Mandatory=$false)]
     [string]$Location = "southeastasia",
     
-    [Parameter(Mandatory=$true)]
-    [string]$AdminUsername,
+    [Parameter(Mandatory=$false)]
+    [ValidateSet("azuser")]
+    [string]$AdminUsername = "azuser",
     
-    [Parameter(Mandatory=$true)]
-    [string]$AdminPassword,
+    [Parameter(Mandatory=$false)]
+    [string]$AdminPassword = "",
     
     [Parameter(Mandatory=$false)]
     [ValidateSet("Overlake", "Non-Overlake")]
@@ -65,6 +66,14 @@ param(
     [Parameter(Mandatory=$false)]
     [switch]$Force
 )
+
+# Enforce project VM username default
+$AdminUsername = "azuser"
+
+if ([string]::IsNullOrWhiteSpace($AdminPassword)) {
+    $secureAdminPassword = Read-Host "Enter admin password for VM deployment" -AsSecureString
+    $AdminPassword = [System.Net.NetworkCredential]::new('', $secureAdminPassword).Password
+}
 
 # =============================================================================
 # HELPER FUNCTIONS

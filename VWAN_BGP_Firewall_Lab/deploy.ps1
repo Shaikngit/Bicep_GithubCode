@@ -21,14 +21,23 @@ param(
     [string]$DeploymentPrefix = "vwan-bgp",
     
     [Parameter(Mandatory = $false)]
-    [string]$AdminUsername = "azureadmin",
+    [ValidateSet("azuser")]
+    [string]$AdminUsername = "azuser",
     
-    [Parameter(Mandatory = $true)]
-    [string]$AdminPassword,
+    [Parameter(Mandatory = $false)]
+    [string]$AdminPassword = "",
     
     [Parameter(Mandatory = $true)]
     [string]$VpnSharedKey
 )
+
+# Enforce project VM username default
+$AdminUsername = "azuser"
+
+if ([string]::IsNullOrWhiteSpace($AdminPassword)) {
+    $secureAdminPassword = Read-Host "Enter admin password for VM deployment" -AsSecureString
+    $AdminPassword = [System.Net.NetworkCredential]::new('', $secureAdminPassword).Password
+}
 
 $ErrorActionPreference = "Stop"
 

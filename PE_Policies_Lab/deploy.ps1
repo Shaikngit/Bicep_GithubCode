@@ -21,10 +21,8 @@ param(
     [string]$DeploymentPrefix = "pelab",
     
     [Parameter(Mandatory = $false)]
-    [string]$AdminUsername = "azureuser",
-    
-    [Parameter(Mandatory = $false)]
-    [string]$AdminPassword = "Wipro@12345678",
+    [ValidateSet("azuser")]
+    [string]$AdminUsername = "azuser",
     
     [Parameter(Mandatory = $false)]
     [switch]$DeployAzureFirewall,
@@ -53,6 +51,19 @@ function Write-Step {
 function Write-Info {
     param([string]$Message)
     Write-Host "[INFO] $Message" -ForegroundColor Gray
+}
+
+function ConvertTo-PlainText {
+    param([SecureString]$SecureValue)
+    if ($null -eq $SecureValue) { return "" }
+
+    $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($SecureValue)
+    try {
+        return [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)
+    }
+    finally {
+        [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
+    }
 }
 
 function Show-ArchitectureDiagram {
@@ -324,6 +335,14 @@ Write-Host "Admin Username    : $AdminUsername" -ForegroundColor White
 Write-Host "Azure Firewall    : $(if ($DeployAzureFirewall) { 'Yes' } else { 'No' })" -ForegroundColor White
 Write-Host ""
 
+$secureAdminPassword = Read-Host "Enter admin password for VM deployment" -AsSecureString
+$adminPasswordPlain = ConvertTo-PlainText -SecureValue $secureAdminPassword
+
+if ([string]::IsNullOrWhiteSpace($adminPasswordPlain)) {
+    Write-Host "Admin password cannot be empty." -ForegroundColor Red
+    exit 1
+}
+
 $confirm = Read-Host "Proceed with deployment? (y/n)"
 if ($confirm -ne 'y' -and $confirm -ne 'Y') {
     Write-Host "Deployment cancelled." -ForegroundColor Yellow
@@ -332,7 +351,7 @@ if ($confirm -ne 'y' -and $confirm -ne 'Y') {
 
 # Check Azure Login
 Write-Step "Checking Azure CLI authentication..."
-$account = az account show 2>&1
+az account show 2>&1 | Out-Null
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Not logged in. Running az login..." -ForegroundColor Yellow
     az login --scope https://management.azure.com/.default
@@ -351,7 +370,7 @@ $deployParams = @(
     "--template-file", "$PSScriptRoot\main.bicep",
     "--parameters", "deploymentPrefix=$DeploymentPrefix",
     "--parameters", "adminUsername=$AdminUsername",
-    "--parameters", "adminPassword=$AdminPassword",
+    "--parameters", "adminPassword=$adminPasswordPlain",
     "--parameters", "location=$Location",
     "--parameters", "deployAzureFirewall=$($DeployAzureFirewall.ToString().ToLower())"
 )

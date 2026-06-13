@@ -31,13 +31,13 @@ Perform a what-if deployment to preview changes without actually deploying
 Skip confirmation prompts and deploy immediately
 
 .EXAMPLE
-./deploy.ps1 -AdminPassword "YourStrongPassword123!"
+./deploy.ps1
 
 .EXAMPLE
-./deploy.ps1 -ResourceGroupName "my-vwan-lab" -Location "eastus" -AdminPassword "YourStrongPassword123!" -Force
+./deploy.ps1 -ResourceGroupName "my-vwan-lab" -Location "eastus" -Force
 
 .EXAMPLE
-./deploy.ps1 -AdminPassword "YourStrongPassword123!" -WhatIf
+./deploy.ps1 -WhatIf
 #>
 
 param(
@@ -47,8 +47,8 @@ param(
     [Parameter(Mandatory=$false)]
     [string]$Location = "southeastasia",
     
-    [Parameter(Mandatory=$true)]
-    [string]$AdminPassword,
+    [Parameter(Mandatory=$false)]
+    [string]$AdminPassword = "",
     
     [Parameter(Mandatory=$false)]
     [string]$SubscriptionId,
@@ -59,6 +59,11 @@ param(
     [Parameter(Mandatory=$false)]
     [switch]$Force
 )
+
+if ([string]::IsNullOrWhiteSpace($AdminPassword)) {
+    $secureAdminPassword = Read-Host "Enter admin password for VM deployment" -AsSecureString
+    $AdminPassword = [System.Net.NetworkCredential]::new('', $secureAdminPassword).Password
+}
 
 # Set error action preference
 $ErrorActionPreference = "Stop"

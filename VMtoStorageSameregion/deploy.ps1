@@ -34,8 +34,7 @@
     Preview deployment without making changes
 
 .EXAMPLE
-    $securePassword = ConvertTo-SecureString "YourStrongPassword123!" -AsPlainText -Force
-    .\deploy.ps1 -AdminPassword $securePassword -AdminUsername "azureuser" -VmSizeOption "Non-Overlake"
+    .\deploy.ps1 -VmSizeOption "Non-Overlake"
 #>
 
 param(
@@ -45,11 +44,12 @@ param(
     [Parameter(Mandatory=$false)]
     [string]$Location = "southeastasia",
     
-    [Parameter(Mandatory=$true)]
+    [Parameter(Mandatory=$false)]
     [SecureString]$AdminPassword,
     
-    [Parameter(Mandatory=$true)]
-    [string]$AdminUsername,
+    [Parameter(Mandatory=$false)]
+    [ValidateSet("azuser")]
+    [string]$AdminUsername = "azuser",
     
     [Parameter(Mandatory=$true)]
     [ValidateSet("Overlake", "Non-Overlake")]
@@ -68,6 +68,13 @@ param(
     [Parameter(Mandatory=$false)]
     [switch]$Force
 )
+
+# Enforce project VM username default
+$AdminUsername = "azuser"
+
+if ($null -eq $AdminPassword) {
+    $AdminPassword = Read-Host "Enter admin password for VM deployment" -AsSecureString
+}
 
 # Helper functions
 function Write-ColorOutput {
