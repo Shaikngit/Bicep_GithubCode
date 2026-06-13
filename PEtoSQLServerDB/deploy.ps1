@@ -39,10 +39,10 @@
     Skip confirmation prompts
 
 .EXAMPLE
-    .\deploy.ps1 -SqlAdministratorLogin "sqladmin" -SqlAdministratorLoginPassword "SqlPass123!"
+    .\deploy.ps1 -SqlAdministratorLogin "sqladmin"
 
 .EXAMPLE
-    .\deploy.ps1 -SqlAdministratorLogin "sqladmin" -SqlAdministratorLoginPassword "SqlPass123!" -WhatIf
+    .\deploy.ps1 -SqlAdministratorLogin "sqladmin" -WhatIf
 #>
 
 param(
@@ -55,15 +55,17 @@ param(
     [Parameter(Mandatory=$true)]
     [string]$SqlAdministratorLogin,
     
-    [Parameter(Mandatory=$true)]
-    [string]$SqlAdministratorLoginPassword,
+    [Parameter(Mandatory=$false)]
+    [Alias("SqlAdministratorLoginPassword")]
+    [SecureString]$SqlAdminSecret,
     
     [Parameter(Mandatory=$false)]
     [ValidateSet("azuser")]
     [string]$VmAdminUsername = "azuser",
     
     [Parameter(Mandatory=$false)]
-    [string]$VmAdminPassword = "",
+    [Alias("VmAdminPassword")]
+    [SecureString]$VmAdminSecret,
     
     [Parameter(Mandatory=$false)]
     [ValidateSet("Overlake", "Non-Overlake")]
@@ -82,9 +84,12 @@ param(
 # Enforce project VM username default
 $VmAdminUsername = "azuser"
 
-if ([string]::IsNullOrWhiteSpace($VmAdminPassword)) {
-    $secureVmPassword = Read-Host "Enter admin password for VM deployment" -AsSecureString
-    $VmAdminPassword = [System.Net.NetworkCredential]::new('', $secureVmPassword).Password
+if ($null -eq $SqlAdminSecret) {
+    $SqlAdminSecret = Read-Host "Enter SQL administrator password" -AsSecureString
+}
+
+if ($null -eq $VmAdminSecret) {
+    $VmAdminSecret = Read-Host "Enter admin password for VM deployment" -AsSecureString
 }
 
 # =============================================================================
@@ -147,13 +152,15 @@ function Test-BicepCLI {
 }
 
 function Test-PasswordComplexity {
-    param([string]$Password, [string]$Type)
+    param([SecureString]$Secret, [string]$Type)
+
+    $plainPassword = [System.Net.NetworkCredential]::new('', $Secret).Password
     
-    $hasUpper = $Password -cmatch '[A-Z]'
-    $hasLower = $Password -cmatch '[a-z]'
-    $hasDigit = $Password -match '\d'
-    $hasSpecial = $Password -match '[^A-Za-z0-9]'
-    $hasLength = $Password.Length -ge 12
+    $hasUpper = $plainPassword -cmatch '[A-Z]'
+    $hasLower = $plainPassword -cmatch '[a-z]'
+    $hasDigit = $plainPassword -match '\d'
+    $hasSpecial = $plainPassword -match '[^A-Za-z0-9]'
+    $hasLength = $plainPassword.Length -ge 12
     
     if ($hasUpper -and $hasLower -and $hasDigit -and $hasSpecial -and $hasLength) {
         Write-ColorOutput "✅ $Type password meets complexity requirements." "Green"
@@ -170,8 +177,8 @@ function Test-Prerequisites {
     $azCliOk = Test-AzureCLI
     $azLoginOk = Test-AzureLogin
     $bicepOk = Test-BicepCLI
-    $sqlPasswordOk = Test-PasswordComplexity -Password $SqlAdministratorLoginPassword -Type "SQL"
-    $vmPasswordOk = Test-PasswordComplexity -Password $VmAdminPassword -Type "VM"
+    $sqlPasswordOk = Test-PasswordComplexity -Secret $SqlAdminSecret -Type "SQL"
+    $vmPasswordOk = Test-PasswordComplexity -Secret $VmAdminSecret -Type "VM"
     
     return ($azCliOk -and $azLoginOk -and $bicepOk -and $sqlPasswordOk -and $vmPasswordOk)
 }
@@ -212,6 +219,9 @@ function Start-Deployment {
     }
     
     # Build deployment command
+    $sqlAdminPasswordPlain = [System.Net.NetworkCredential]::new('', $SqlAdminSecret).Password
+    $vmAdminPasswordPlain = [System.Net.NetworkCredential]::new('', $VmAdminSecret).Password
+
     $deployCmd = @(
         "az", "deployment", "group", "create"
         "--resource-group", $ResourceGroupName
@@ -219,9 +229,9 @@ function Start-Deployment {
         "--name", $deploymentName
         "--parameters"
         "sqlAdministratorLogin=$SqlAdministratorLogin"
-        "sqlAdministratorLoginPassword=$SqlAdministratorLoginPassword"
+        "sqlAdministratorLoginPassword=$sqlAdminPasswordPlain"
         "vmAdminUsername=$VmAdminUsername"
-        "vmAdminPassword=$VmAdminPassword"
+        "vmAdminPassword=$vmAdminPasswordPlain"
         "vmSizeOption=$VmSizeOption"
     )
     

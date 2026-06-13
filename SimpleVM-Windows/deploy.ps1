@@ -54,7 +54,8 @@ param(
     [string]$AdminUsername = "azuser",
     
     [Parameter(Mandatory=$false)]
-    [string]$AdminPassword = "",
+    [Alias("AdminPassword")]
+    [SecureString]$AdminSecret,
     
     [Parameter(Mandatory=$false)]
     [string]$AllowedRdpSourceAddress,
@@ -83,9 +84,8 @@ param(
 # Enforce project VM username default
 $AdminUsername = "azuser"
 
-if ([string]::IsNullOrWhiteSpace($AdminPassword)) {
-    $secureAdminPassword = Read-Host "Enter admin password for VM deployment" -AsSecureString
-    $AdminPassword = [System.Net.NetworkCredential]::new('', $secureAdminPassword).Password
+if ($null -eq $AdminSecret) {
+    $AdminSecret = Read-Host "Enter admin password for VM deployment" -AsSecureString
 }
 
 # =============================================================================
@@ -148,13 +148,15 @@ function Test-BicepCLI {
 }
 
 function Test-PasswordComplexity {
-    param([string]$Password)
+    param([SecureString]$Secret)
+
+    $plainPassword = [System.Net.NetworkCredential]::new('', $Secret).Password
     
-    $hasUpper = $Password -cmatch '[A-Z]'
-    $hasLower = $Password -cmatch '[a-z]'
-    $hasDigit = $Password -cmatch '\d'
-    $hasSpecial = $Password -match '[^A-Za-z0-9]'
-    $hasLength = $Password.Length -ge 12
+    $hasUpper = $plainPassword -cmatch '[A-Z]'
+    $hasLower = $plainPassword -cmatch '[a-z]'
+    $hasDigit = $plainPassword -cmatch '\d'
+    $hasSpecial = $plainPassword -match '[^A-Za-z0-9]'
+    $hasLength = $plainPassword.Length -ge 12
     
     if ($hasUpper -and $hasLower -and $hasDigit -and $hasSpecial -and $hasLength) {
         Write-ColorOutput "✅ Password meets complexity requirements." "Green"
@@ -181,7 +183,7 @@ function Test-Prerequisites {
     $azCliOk = Test-AzureCLI
     $azLoginOk = Test-AzureLogin
     $bicepOk = Test-BicepCLI
-    $passwordOk = Test-PasswordComplexity -Password $AdminPassword
+    $passwordOk = Test-PasswordComplexity -Secret $AdminSecret
     
     return ($azCliOk -and $azLoginOk -and $bicepOk -and $passwordOk)
 }
@@ -230,6 +232,8 @@ function Start-Deployment {
     }
     
     # Build deployment command
+    $adminPasswordPlain = [System.Net.NetworkCredential]::new('', $AdminSecret).Password
+
     $deployCmd = @(
         "az", "deployment", "group", "create"
         "--resource-group", $ResourceGroupName
@@ -237,7 +241,7 @@ function Start-Deployment {
         "--name", $deploymentName
         "--parameters"
         "adminUsername=$AdminUsername"
-        "adminPassword=$AdminPassword"
+        "adminPassword=$adminPasswordPlain"
         "allowedRdpSourceAddress=$AllowedRdpSourceAddress"
         "vmSizeOption=$VmSizeOption"
         "enableBastion=$($EnableBastion.ToString().ToLower())"
